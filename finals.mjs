@@ -2,7 +2,7 @@ import {resolveFinals,finalsDefinitions} from './finals-core.mjs';
 const $=id=>document.getElementById(id);let data=null,busy=false;
 const sourceLabel=source=>source.includes('-')?`Liga ${source[1]} · Platz ${source.split('-')[1]}`:`${source[0]==='W'?'Sieger':'Verlierer'} Spiel ${source.slice(1)}`;
 function node(tag,className,text){const element=document.createElement(tag);if(className)element.className=className;if(text!==undefined)element.textContent=text;return element;}
-function setBusy(value){busy=value;document.querySelectorAll('button,.finals-score').forEach(b=>b.disabled=value);$('start-finals').disabled=value||!!data?.state||!data?.preview?.ready;}
+function setBusy(value){busy=value;document.querySelectorAll('button,.finals-score').forEach(b=>b.disabled=value);$('start-finals').disabled=value||data?.role!=='admin'||!!data?.state||!data?.preview?.ready;}
 async function load(){
  if(busy)return;setBusy(true);$('finals-status').textContent='Finals werden geladen …';
  try{const response=await fetch('/api/finals');const result=await response.json();if(!response.ok)throw Error(result.error||'Laden fehlgeschlagen');data=result;render();$('finals-status').textContent='Stand geladen. Ergebnisse werden dauerhaft gespeichert.';}
@@ -34,7 +34,7 @@ function matchCard(match){
  const score=side=>{const input=node('input','finals-score');input.type='number';input.min='0';input.max='99';input.step='1';input.inputMode='numeric';input.required=true;input.value=match[side+'Score']??'';input.setAttribute('aria-label',`Spiel ${match.id}: gewonnene Matches von ${match[side].name}`);return input;};
  const home=score('home'),away=score('away');left.append(home);right.append(away);form.append(left,node('span','',':'),right);
  const actions=node('div','finals-result-actions'),save=node('button','',match.winner?'Ergebnis ändern':'Ergebnis speichern');save.type='submit';actions.append(save);
- if(match.winner){const reset=node('button','','Zurücksetzen');reset.type='button';reset.onclick=()=>{if(confirm(`Ergebnis von Spiel ${match.id} zurücksetzen?`))mutate({action:'clearResult',matchId:match.id});};actions.append(reset);}
+ if(match.winner&&data.role==='admin'){const reset=node('button','','Zurücksetzen');reset.type='button';reset.onclick=()=>{if(confirm(`Ergebnis von Spiel ${match.id} zurücksetzen?`))mutate({action:'clearResult',matchId:match.id});};actions.append(reset);}
  const error=node('p','match-error');error.setAttribute('role','alert');form.append(actions,error);
  form.onsubmit=async event=>{event.preventDefault();if(home.value===''||away.value==='')return;const success=await mutate({action:'result',matchId:match.id,homeScore:Number(home.value),awayScore:Number(away.value)});if(!success)error.textContent=$('finals-status').textContent;};card.append(form);return card;
 }

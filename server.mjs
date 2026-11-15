@@ -4,7 +4,7 @@ import {fileURLToPath} from 'node:url';
 import {parseLog,demo} from './core.mjs';
 import {clanPlacements} from './rankings.mjs';
 import {createStorage} from './storage.mjs';
-import {authorized,sameOrigin} from './access.mjs';
+import {accessRole,playerRouteAllowed,sameOrigin} from './access.mjs';
 import {emptyLeagues,updateLeagues} from './leagues.mjs';
 import {prepareLeagues} from './league-core.mjs';
 import {finalsPreview,resolveFinals,updateFinals} from './finals-core.mjs';
@@ -30,31 +30,36 @@ export const server=http.createServer(async(req,res)=>{
  const send=(status,value)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify(value));};
  try{
  if(req.method==='GET'&&req.url==='/health')return send(200,{status:'ok'});
- if(!authorized(req.headers.authorization)){res.writeHead(401,{'WWW-Authenticate':'Basic realm="War Imperium", charset="UTF-8"','Cache-Control':'no-store'});res.end('Bitte mit deinem App-Zugang anmelden.');return;}
+ const role=accessRole(req.headers.authorization);
+ if(!role){res.writeHead(401,{'WWW-Authenticate':'Basic realm="War Imperium", charset="UTF-8"','Cache-Control':'no-store'});res.end('Bitte mit deinem App-Zugang anmelden.');return;}
+ if(role==='player'&&!playerRouteAllowed(req.method,req.url))return send(403,{error:'Dieser Zugang ist nur für Liga, Finals und Ergebniseingabe freigeschaltet.'});
+ if(role==='player'&&req.method==='GET'&&req.url==='/'){res.writeHead(302,{Location:'/liga','Cache-Control':'no-store'});res.end();return;}
  if(req.method==='GET'&&req.url==='/api/finals'){
-  const state=await storage.read('finals',null);return send(200,{state,view:resolveFinals(state),preview:finalsPreview(await storage.read('leagues',emptyLeagues()))});
+  const state=await storage.read('finals',null);return send(200,{role,state,view:resolveFinals(state),preview:finalsPreview(await storage.read('leagues',emptyLeagues()))});
  }
  if(req.method==='POST'&&req.url==='/api/finals'){
   if(!sameOrigin(req)||req.headers['x-war-imperium']!=='local')return send(403,{error:'Anfrage nicht erlaubt'});
   let body='';for await(const chunk of req){body+=chunk;if(body.length>4096)return send(413,{error:'Anfrage zu groß'});}
   let input;try{input=JSON.parse(body);}catch{return send(400,{error:'Ungültige Eingabe'});}
+  if(role==='player'&&input?.action!=='result')return send(403,{error:'Mit diesem Zugang können nur Ergebnisse eingetragen oder geändert werden.'});
   if(finalsBusy)return send(409,{error:'Speicherung läuft. Bitte erneut versuchen.'});finalsBusy=true;
   try{
    const current=await storage.read('finals',null);let next;
    try{next=updateFinals(current,input,await storage.read('leagues',emptyLeagues()));}catch(e){if(e.status)return send(e.status,{error:e.message});throw e;}
-   await storage.write('finals',next);return send(200,{state:next,view:resolveFinals(next)});
+   await storage.write('finals',next);return send(200,{role,state:next,view:resolveFinals(next)});
   }finally{finalsBusy=false;}
  }
- if(req.method==='GET'&&req.url==='/api/leagues')return send(200,{state:prepareLeagues(await storage.read('leagues',emptyLeagues())),members:(await roster())?.members??[]});
+ if(req.method==='GET'&&req.url==='/api/leagues')return send(200,{role,state:prepareLeagues(await storage.read('leagues',emptyLeagues())),members:role==='admin'?(await roster())?.members??[]:[]});
  if(req.method==='POST'&&req.url==='/api/leagues'){
   if(!sameOrigin(req)||req.headers['x-war-imperium']!=='local')return send(403,{error:'Anfrage nicht erlaubt'});
   let body='';for await(const chunk of req){body+=chunk;if(body.length>4096)return send(413,{error:'Anfrage zu groß'});}
   let input;try{input=JSON.parse(body);}catch{return send(400,{error:'Ungültige Eingabe'});}
+  if(role==='player'&&input?.action!=='result')return send(403,{error:'Mit diesem Zugang können nur Ergebnisse eingetragen oder geändert werden.'});
   if(leaguesBusy)return send(409,{error:'Speicherung läuft. Bitte erneut versuchen.'});leaguesBusy=true;
   try{
    const current=await storage.read('leagues',emptyLeagues());let next;
    try{next=updateLeagues(current,input);}catch(e){if(e.status)return send(e.status,{error:e.message});throw e;}
-   await storage.write('leagues',next);return send(200,{state:next});
+   await storage.write('leagues',next);return send(200,{role,state:next});
   }finally{leaguesBusy=false;}
  }
  if(req.method==='POST' && req.url==='/api/absence'){

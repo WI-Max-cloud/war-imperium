@@ -10,6 +10,15 @@ import {createStorage} from './storage.mjs';
 import {emptyLeagues,updateLeagues} from './leagues.mjs';
 import {scheduleLeague,leagueStandings} from './league-core.mjs';
 import {leagueZones} from './league-core.mjs';
+import {accessRole,playerRouteAllowed} from './access.mjs';
+test('Spielerzugang ist getrennt vom Verwalter und darf nur Turnierrouten öffnen',()=>{
+ const env={APP_USER:'admin',APP_PASSWORD:'test-admin-password',PLAYER_USER:'Spieler',PLAYER_PASSWORD:'test-player-password'};
+ assert.equal(accessRole('Basic '+Buffer.from('Spieler:test-player-password').toString('base64'),env),'player');
+ assert.equal(accessRole('Basic '+Buffer.from('admin:test-admin-password').toString('base64'),env),'admin');
+ assert.equal(accessRole('Basic '+Buffer.from('Spieler:wrong').toString('base64'),env),null);
+ for(const path of ['/api/history','/api/demo','/api/sync','/api/absence','/api/placements','/app.mjs','/.env'])assert.equal(playerRouteAllowed('GET',path),false);
+ assert.equal(playerRouteAllowed('GET','/liga'),true);assert.equal(playerRouteAllowed('GET','/finals'),true);assert.equal(playerRouteAllowed('POST','/api/leagues'),true);
+});
 test('0:0 zählt als gespielt mit null Punkten für beide und bleibt beim Neuaufbau erhalten',()=>{
  let state={revision:0,leagues:[{id:1,name:'Liga 1',players:[{id:'a',name:'A'},{id:'b',name:'B'}]}]};
  state=updateLeagues(state,{action:'result',leagueId:1,matchId:'a:b',homeScore:0,awayScore:0,revision:0});
