@@ -2,11 +2,54 @@ import {leagueStandings,leagueZones} from './league-core.mjs';
 const $=id=>document.getElementById(id);
 let state=null,busy=false,isAdmin=false;
 const openRounds=new Set();
+const pdfRanges=new Map();
+const pdfReport=document.createElement('div');pdfReport.id='matchday-report';document.body.append(pdfReport);
+function printMatchdays(league,from,to){
+ if(busy)return;
+ const matches=(league.matches??[]).filter(m=>m.round>=from&&m.round<=to);
+ if(!matches.length)return;
+ pdfReport.replaceChildren();
+ const title=document.createElement('h2');title.textContent=`War Imperium Liga · ${league.name}`;
+ const summary=document.createElement('p');summary.textContent=`${from===to?'Spieltag '+from:'Spieltage '+from+' bis '+to} · Stand: ${new Date().toLocaleString('de-DE')}`;
+ const note=document.createElement('p');note.textContent='Gespeicherte Ergebnisse; „Offen“ bedeutet noch kein Ergebnis. 0:0 zählt als absolviertes Spiel mit 0 Punkten für beide.';
+ pdfReport.append(title,summary,note);
+ const names=new Map(league.players.map(p=>[p.id,p.name]));
+ for(const round of [...new Set(matches.map(m=>m.round))]){
+  const section=document.createElement('section'),heading=document.createElement('h3');heading.textContent=`Spieltag ${round}`;section.append(heading);
+  const table=document.createElement('table'),thead=document.createElement('thead'),head=document.createElement('tr');
+  ['Spieler','Ergebnis','Gegner'].forEach(label=>{const th=document.createElement('th');th.textContent=label;head.append(th);});thead.append(head);table.append(thead);
+  const tbody=document.createElement('tbody'),active=new Set();
+  for(const match of matches.filter(m=>m.round===round)){
+   active.add(match.home);active.add(match.away);const row=document.createElement('tr');
+   [names.get(match.home),match.homeScore===null||match.awayScore===null?'Offen':`${match.homeScore}:${match.awayScore}`,names.get(match.away)].forEach(value=>{const td=document.createElement('td');td.textContent=value;row.append(td);});tbody.append(row);
+  }
+  table.append(tbody);section.append(table);
+  const free=league.players.filter(p=>!active.has(p.id));if(free.length){const p=document.createElement('p');p.textContent='Spielfrei: '+free.map(p=>p.name).join(', ');section.append(p);}
+  pdfReport.append(section);
+ }
+ const previousTitle=document.title;document.title=`War Imperium ${league.name} Spieltage ${from}-${to}`;document.body.classList.add('print-matchdays');
+ const restore=()=>{document.body.classList.remove('print-matchdays');document.title=previousTitle;pdfReport.replaceChildren();};window.addEventListener('afterprint',restore,{once:true});
+ try{window.print();}catch(e){window.removeEventListener('afterprint',restore);restore();throw e;}
+}
+function matchdayExport(league){
+ const rounds=[...new Set((league.matches??[]).map(m=>m.round))].sort((a,b)=>a-b);
+ const menu=document.createElement('div');menu.className='matchday-export';
+ const from=document.createElement('select'),to=document.createElement('select');
+ for(const round of rounds){from.add(new Option(`Spieltag ${round}`,String(round)));to.add(new Option(`Spieltag ${round}`,String(round)));}
+ const saved=pdfRanges.get(league.id);from.value=String(rounds.includes(saved?.from)?saved.from:rounds[0]);to.value=String(rounds.includes(saved?.to)?saved.to:rounds.at(-1));
+ for(const [text,input] of [['Von Spieltag',from],['Bis Spieltag',to]]){const label=document.createElement('label');label.textContent=text;input.setAttribute('aria-label',`${league.name}: ${text}`);label.append(input);menu.append(label);}
+ const button=document.createElement('button');button.type='button';button.className='matchday-pdf';button.textContent='Auswahl als PDF speichern';
+ const note=document.createElement('p');note.className='schedule-note';note.textContent='Exportiert nur diese Liga und die gewählten Spieltage mit gespeicherten Ergebnissen.';
+ const change=()=>{if(Number(to.value)<Number(from.value))to.value=from.value;for(const option of to.options)option.disabled=Number(option.value)<Number(from.value);pdfRanges.set(league.id,{from:Number(from.value),to:Number(to.value)});};from.onchange=change;to.onchange=change;if(rounds.length)change();
+ from.disabled=to.disabled=button.disabled=rounds.length===0;
+ button.onclick=()=>printMatchdays(state.leagues.find(l=>l.id===league.id),Number(from.value),Number(to.value));menu.append(button,note);return menu;
+}
 function toggleBusy(value){busy=value;$('add-player').disabled=value||!state;$('reload-leagues').disabled=value;document.querySelectorAll('.remove-player,.match-save,.match-reset,.match-score').forEach(b=>b.disabled=value);}
 function renderSchedule(league,section){
  const title=document.createElement('h3');title.textContent='Spielplan · Jeder gegen jeden';section.append(title);
  const matches=league.matches??[],note=document.createElement('p');note.className='schedule-note';
  note.textContent=matches.length?`${matches.filter(m=>m.homeScore!==null).length} / ${matches.length} Spiele abgeschlossen · Jede Paarung genau einmal.`:'Ab zwei Teilnehmern wird der Spielplan automatisch erstellt.';section.append(note);
+ section.append(matchdayExport(league));
  const names=new Map(league.players.map(p=>[p.id,p.name]));
  for(const round of [...new Set(matches.map(m=>m.round))]){
   const roundMatches=matches.filter(m=>m.round===round),details=document.createElement('details'),summary=document.createElement('summary'),key=`${league.id}-${round}`;
