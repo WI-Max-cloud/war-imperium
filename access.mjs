@@ -9,7 +9,7 @@ export function accessRole(header,env=process.env){
  return null;
 }
 export const authorized=(header,env=process.env)=>!!accessRole(header,env);
-export function playerRouteAllowed(method,path){return method==='GET'&&['/','/liga','/liga.html','/finals','/finals.html','/liga.mjs','/finals.mjs','/league-core.mjs','/finals-core.mjs','/style.css','/liga.css','/api/leagues','/api/finals'].includes(path)||method==='POST'&&['/api/leagues','/api/finals'].includes(path);}
+export function playerRouteAllowed(method,path){return method==='GET'&&['/','/liga','/liga.html','/finals','/finals.html','/liga.mjs','/finals.mjs','/league-core.mjs','/finals-core.mjs','/style.css','/liga.css','/responsive.mjs','/api/leagues','/api/finals'].includes(path)||method==='POST'&&['/api/leagues','/api/finals'].includes(path);}
 export function sameOrigin(req,env=process.env){
  if(!req.headers.origin)return true;
  const expected=env.PUBLIC_ORIGIN||env.RENDER_EXTERNAL_URL||`http://${req.headers.host}`;

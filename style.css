@@ -19,3 +19,41 @@ td.score-low{color:#ff8585}td.score-high{color:#74dfa1}@media print{td.score-low
 .report-summary{display:none}@media print{body.print-report main>section:not(.attendance-panel):not(.placement-panel):not(.trend-panel),body.print-report aside{display:none!important}body.print-report .attendance-panel,body.print-report .placement-panel,body.print-report .trend-panel{display:block!important;margin:0}body.print-report .report-summary{display:block;margin-bottom:6mm}body.print-report .attendance-panel>label,body.print-report .attendance-panel>p:not(.report-summary),body.print-report .placement-panel>button,body.print-report .absence-check input{display:none}body.print-report .attendance-panel th:nth-child(1){width:40%}body.print-report .attendance-panel th:nth-child(2){width:15%}body.print-report .attendance-panel th:nth-child(3){width:15%}body.print-report .attendance-panel th:nth-child(4){width:30%}body.print-report .placement-panel,body.print-report .trend-panel{break-before:page}body.print-report .placement-grid{grid-template-columns:1fr 1fr}body.print-report .placement-grid article{background:white;border-color:#aaa;break-inside:avoid}body.print-report .placement-grid strong,body.print-report .placement-grid h3{color:black}body.print-report .trend-scroll{overflow:visible}body.print-report .trend-scroll svg{min-width:0;width:100%;break-inside:avoid}body.print-report .chart-axis{fill:#333}body.print-report .chart-value{fill:#775000}body.print-report .trend-scroll polyline{stroke:#986c00}body.print-report .trend-scroll circle{fill:#986c00}body.print-report .trend-scroll summary{display:none}body.print-report .trend-scroll details{display:block}body.print-report .trend-scroll th:nth-child(1){width:25%}body.print-report .trend-scroll th:nth-child(2){width:45%}body.print-report .trend-scroll table{margin-top:5mm}body.print-report h2{font-size:16pt}body.print-report .absence-check span{font-size:10pt}}
 
 .site-nav{display:flex;align-items:center;gap:22px}.site-nav a{display:inline-block;padding:8px 16px;border:1px solid #edc97a;border-radius:7px;color:#edc97a;text-decoration:none;font-size:14px;letter-spacing:0}.site-nav a:focus-visible{outline:3px solid white}@media(max-width:500px){header{flex-wrap:wrap;gap:16px}.site-nav{gap:14px}}@media print{.site-nav a{display:none}}
+[hidden]{display:none!important}
+.mobile-trend{display:none}
+main,.panel,.table,section,article,nav,label{min-width:0}
+@media screen and (max-width:900px){
+ body{font-size:15px;overflow-wrap:anywhere}
+ header{padding:18px 16px;gap:16px;flex-wrap:wrap}
+ header nav,.site-nav{flex-wrap:wrap;gap:14px;max-width:100%}
+ main{width:100%;padding:28px 14px}
+ h1{font-size:clamp(30px,8vw,44px);letter-spacing:-1px}
+ h2{font-size:20px}
+ .panel{padding:16px}
+ button,select,input{max-width:100%;font-size:16px;min-height:44px}
+ button{white-space:normal;overflow-wrap:anywhere}
+ select{width:100%;min-width:0}
+ .actions{gap:10px;margin:22px 0}
+ .actions button{flex:1 1 100%;width:100%}
+ .filters{display:grid;grid-template-columns:minmax(0,1fr);gap:18px}
+ .filters label{width:100%}
+ .filters input[type=checkbox]{min-height:0;width:22px;height:22px}
+ .placement-grid{grid-template-columns:minmax(0,1fr)}
+ .table,.trend-scroll{overflow:visible;width:100%;max-width:100%}
+ table,.league-table table{display:block;width:100%;min-width:0!important;max-width:100%;white-space:normal;table-layout:auto}
+ table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+ table tbody{display:grid;gap:14px;width:100%}
+ table tbody tr{display:block;border:1px solid #405361;border-radius:9px;padding:7px 12px;background:#101d29}
+ table tbody td,.league-table table tbody td{display:grid;grid-template-columns:minmax(0,40%) minmax(0,1fr);gap:12px;align-items:start;width:auto!important;min-width:0!important;padding:10px 0;font-size:14px;border-bottom:1px solid #30404d;overflow-wrap:anywhere;white-space:normal}
+ table tbody td:last-child{border-bottom:0}
+ table tbody td::before{content:attr(data-label);font-weight:400;color:#91a7b8;font-size:12px;line-height:1.8}
+ .absence-check{flex-wrap:wrap;min-width:0}
+ .absence-check input{flex:0 0 22px;min-height:0}
+ .trend-scroll>svg{display:none}
+ .mobile-trend{display:grid;gap:16px;margin:24px 0}
+ .mobile-trend-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 10px}
+ .mobile-trend-row strong{color:#edc97a;font-size:14px}
+ .mobile-trend-row small,.mobile-trend-row progress{grid-column:1 / -1}
+ .mobile-trend-row progress{width:100%;height:12px;accent-color:#edc97a}
+ .attendance-panel>label{max-width:none}
+}

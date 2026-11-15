@@ -109,6 +109,16 @@ function renderTrend(){
  svg.append(element('polyline',{points:coords.map(p=>`${p.x},${p.y}`).join(' '),fill:'none',stroke:'#edc97a','stroke-width':3}));
  points.forEach((p,i)=>{const {x,y}=coords[i];const circle=element('circle',{cx:x,cy:y,r:6,fill:'#edc97a',tabindex:0});circle.append(element('title',{},`${p.date??'Datum nicht verfügbar'}: ${p.points.toLocaleString('de-DE')} Punkte`));svg.append(circle,element('text',{x,y:y-15,'text-anchor':'middle',class:'chart-value'},(p.points<min?'↓ ':'')+p.points.toLocaleString('de-DE')),element('text',{x,y:height-52,'text-anchor':'middle',class:'chart-axis'},p.date??(demo?'Demo': 'Ohne Datum')),element('text',{x,y:height-30,'text-anchor':'middle',class:'chart-axis'},`S${p.season} / W${p.section+1}`));});
  chartHost.append(svg);
+ const mobileChart=document.createElement('div');mobileChart.className='mobile-trend';mobileChart.setAttribute('aria-label','Clanpunkte nach Woche');
+ for(const point of points){
+  const row=document.createElement('div');row.className='mobile-trend-row';
+  const date=document.createElement('span');date.textContent=point.date??(demo?'Demo':'Ohne Datum');
+  const value=document.createElement('strong');value.textContent=`${point.points.toLocaleString('de-DE')} Punkte`;
+  const week=document.createElement('small');week.textContent=`Saison ${point.season} · Woche ${point.section+1}${point.points<min?' · Unter 120.000':''}`;
+  const bar=document.createElement('progress');bar.max=axisMax-min;bar.value=Math.max(0,point.points-min);bar.setAttribute('aria-label',`${point.points.toLocaleString('de-DE')} Punkte, Achse ab 120.000`);
+  row.append(date,value,week,bar);mobileChart.append(row);
+ }
+ chartHost.append(mobileChart);
  const details=document.createElement('details'),summary=document.createElement('summary');summary.textContent='Alle Wochenpunkte als Tabelle anzeigen';details.append(summary);
  const table=document.createElement('table');const head=document.createElement('thead'),headRow=document.createElement('tr');['Abschlussdatum','Kriegswoche','Clanpunkte'].forEach(v=>{const th=document.createElement('th');th.textContent=v;headRow.append(th)});head.append(headRow);table.append(head);
  const body=document.createElement('tbody');for(const p of points){const tr=document.createElement('tr');[p.date??(demo?'Demo':'Nicht verfügbar'),`Saison ${p.season} · Woche ${p.section+1}`,p.points.toLocaleString('de-DE')].forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.append(td)});body.append(tr);}table.append(body);details.append(table);chartHost.append(details);

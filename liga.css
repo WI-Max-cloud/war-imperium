@@ -11,3 +11,9 @@ header nav{display:flex;gap:20px;letter-spacing:0}header a{color:#edc97a;text-de
 .finals-stage{position:relative}.finals-stage:not(:last-child)::after{content:"→";position:absolute;right:-22px;top:50%;color:#edc97a;font-size:24px}@media(max-width:650px){.finals-stage:not(:last-child)::after{content:"↓";right:50%;top:auto;bottom:-22px}}
 
 .league-menu form[hidden]{display:none}
+
+@media screen and (max-width:1000px){.finals-stages{flex-wrap:wrap;overflow:visible}.finals-stage{flex:1 1 280px;min-width:0}.finals-stage::after{display:none}}
+@media screen and (max-width:900px){.league-form-row{grid-template-columns:minmax(0,1fr)}.league-menu form,.league-tables,.finals-bracket{grid-template-columns:minmax(0,1fr)}.league-menu form>label,.league-form-row label{min-width:0}.league-table h2{flex-wrap:wrap;gap:8px}.league-table .table{overflow:visible}.league-table td:last-child{width:auto}.qualification-cell{min-width:0}.qualification-badge{white-space:normal;overflow-wrap:anywhere}.match-form{grid-template-columns:minmax(0,1fr) 10px minmax(0,1fr);gap:12px}.match-form>*{min-width:0}.match-actions{grid-column:1 / -1}.match-actions button{min-height:44px}.match-score{width:100%;font-size:16px}.finals-slots{grid-template-columns:minmax(0,1fr)}.finals-stages{display:grid;grid-template-columns:minmax(0,1fr)}.finals-stage{min-width:0}.finals-match{padding:14px}.finals-player>div{min-width:0}.finals-player .match-number{flex-shrink:0}.finals-result{grid-template-columns:minmax(0,1fr) 10px minmax(0,1fr)}.finals-result label{min-width:0}.finals-result-actions button{flex:1 1 100%;min-height:44px}.finals-score{min-width:0;font-size:16px}.finals-link{max-width:100%;white-space:normal;min-height:44px}.finals-champion strong{font-size:26px;overflow-wrap:anywhere}}
+
+
+@media screen and (max-width:900px){.qualification-cell .qualification-badge{grid-column:2;justify-self:start}}

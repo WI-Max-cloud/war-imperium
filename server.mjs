@@ -122,7 +122,7 @@ export const server=http.createServer(async(req,res)=>{
    return send(200,{imported:incoming.length,total:merged.size});
   }finally{busy=false;}
  }
- const files={'/':'index.html','/liga':'liga.html','/finals':'finals.html','/finals.html':'finals.html','/finals.mjs':'finals.mjs','/liga.html':'liga.html','/liga.mjs':'liga.mjs','/liga.css':'liga.css','/league-core.mjs':'league-core.mjs','/finals-core.mjs':'finals-core.mjs','/app.mjs':'app.mjs','/core.mjs':'core.mjs','/export.mjs':'export.mjs','/style.css':'style.css'};
+ const files={'/':'index.html','/liga':'liga.html','/finals':'finals.html','/finals.html':'finals.html','/finals.mjs':'finals.mjs','/liga.html':'liga.html','/liga.mjs':'liga.mjs','/liga.css':'liga.css','/league-core.mjs':'league-core.mjs','/finals-core.mjs':'finals-core.mjs','/app.mjs':'app.mjs','/core.mjs':'core.mjs','/export.mjs':'export.mjs','/responsive.mjs':'responsive.mjs','/style.css':'style.css'};
  if(req.method!=='GET'||!files[req.url])return send(404,{error:'Nicht gefunden'});
  res.writeHead(200,{'Content-Type':req.url.endsWith('.mjs')?'text/javascript':req.url.endsWith('.css')?'text/css':'text/html; charset=utf-8','Content-Security-Policy':"default-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'"});
  res.end(await readFile(new URL(files[req.url],root)));
