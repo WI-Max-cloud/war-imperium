@@ -12,6 +12,35 @@ import {scheduleLeague,leagueStandings} from './league-core.mjs';
 import {leagueZones} from './league-core.mjs';
 import {accessRole,playerRouteAllowed} from './access.mjs';
 import {membershipRows,validJoinedOn} from './membership.mjs';
+import {scanPlayerRankings} from './player-rankings.mjs';
+test('Spielerranglisten prüfen alle entdeckten Regionen und Modi, verfolgen Seiten und melden Teilfehler',async()=>{
+ const calls=[],progress=[];
+ const result=await scanPlayerRankings(async path=>{
+  calls.push(path);
+  if(path==='clans/%2322QJG0')return {memberList:[{tag:'#A',name:'Aktueller Name'},{tag:'#B',name:'B'}]};
+  if(path.startsWith('locations?'))return {items:[{id:1,name:'Germany'},{id:2,name:'France'}]};
+  if(path==='leaderboards')return {items:[{id:10,name:'Modus'},{id:11,name:null}]};
+  if(path.startsWith('globaltournaments?'))return {items:[{tag:'#TOUR',title:'Turnier'}]};
+  if(path.startsWith('leaderboard/10'))return path.includes('after=')?{items:[{tag:'#A',rank:1500,score:100}]}:{items:[{tag:'#OUTSIDER',rank:1}],paging:{cursors:{after:'next'}}};
+  if(path.startsWith('locations/2/pathoflegend'))throw Error('API antwortet mit Status 503');
+  if(path.startsWith('locations/1/rankings/players'))return {items:[{tag:'#B',rank:12,trophies:10000},{tag:'#OUTSIDER',rank:3}]};
+  if(path.includes('tournaments/'))return {items:[{tag:'#A',rank:10,score:12}]};
+  return {items:[]};
+ },p=>progress.push(p));
+ assert.equal(result.total,9);assert.equal(result.completed,9);assert.equal(result.hits.length,3);assert.equal(result.partial,true);
+ assert.equal(result.hits.find(h=>h.boardId==='mode-10').rank,1500);assert.equal(result.hits.find(h=>h.tag==='#A').name,'Aktueller Name');
+ assert.ok(calls.some(p=>p.includes('after=next')));assert.ok(result.coverage.some(b=>b.error?.includes('503')));assert.ok(result.coverage.some(b=>b.name.includes('ID 11')));assert.equal(progress.at(-1).completed,9);
+});
+test('Fehlende Ranglistenquellen und Ratenlimits erzeugen keine falsche vollständige Prüfung',async()=>{
+ const result=await scanPlayerRankings(async path=>{
+  if(path==='clans/%2322QJG0')return {memberList:[{tag:'#A',name:'A'}]};
+  if(path.startsWith('locations?'))throw Error('API antwortet mit Status 503');
+  if(path==='leaderboards')return {items:[{id:10,name:'Modus'}]};
+  if(path.startsWith('globaltournaments?'))return {items:[]};
+  throw Error('API-Limit erreicht. Später erneut versuchen.');
+ });
+ assert.equal(result.partial,true);assert.equal(result.hits.length,0);assert.ok(result.discovery.some(d=>d.source==='Länder und Regionen'));assert.ok(result.coverage.some(b=>b.error));
+});
 test('Manuelle Kriegsdaten sortieren älteste zuerst und leere Daten zuletzt',()=>{
  const members=[{tag:'#A',name:'A'},{tag:'#B',name:'B'},{tag:'#C',name:'C'},{tag:'#D',name:'D'}];
  const profiles={'#A':{joinedOn:'2026-11-01'},'#B':{joinedOn:'2025-01-01'},'#D':{joinedOn:'2025-01-01'}};

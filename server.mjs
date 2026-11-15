@@ -9,6 +9,7 @@ import {emptyLeagues,updateLeagues} from './leagues.mjs';
 import {prepareLeagues} from './league-core.mjs';
 import {finalsPreview,resolveFinals,updateFinals} from './finals-core.mjs';
 import {validJoinedOn} from './membership.mjs';
+import {scanPlayerRankings} from './player-rankings.mjs';
 const root=new URL('./',import.meta.url), data=new URL('./data/',root);
 const storage=createStorage({directory:data});
 if(process.env.RENDER==='true'&&(!process.env.APP_PASSWORD||process.env.APP_PASSWORD.length<16))throw Error('Für Render ein APP_PASSWORD mit mindestens 16 Zeichen setzen.');
@@ -17,6 +18,7 @@ let attendanceBusy=false;
 let leaguesBusy=false;
 let finalsBusy=false;
 let membershipBusy=false;
+let playerRankingJob=null,playerRankingResult;
 async function absences(){return storage.read('absences',{});}
 async function history(){return storage.read('history',[]);}
 async function roster(){return storage.read('members',null);}
@@ -36,6 +38,20 @@ export const server=http.createServer(async(req,res)=>{
  if(!role){res.writeHead(401,{'WWW-Authenticate':'Basic realm="War Imperium", charset="UTF-8"','Cache-Control':'no-store'});res.end('Bitte mit deinem App-Zugang anmelden.');return;}
  if(role==='player'&&!playerRouteAllowed(req.method,req.url))return send(403,{error:'Dieser Zugang ist nur für Liga, Finals und Ergebniseingabe freigeschaltet.'});
  if(role==='player'&&req.method==='GET'&&req.url==='/'){res.writeHead(302,{Location:'/liga','Cache-Control':'no-store'});res.end();return;}
+ if((req.method==='GET'||req.method==='POST')&&req.url==='/api/player-rankings'){
+  if(playerRankingResult===undefined)playerRankingResult=await storage.read('player-rankings',null);
+  const response=()=>({running:!!playerRankingJob?.running,progress:playerRankingJob?.progress??null,error:playerRankingJob?.error??null,result:playerRankingResult});
+  if(req.method==='GET')return send(200,response());
+  if(!sameOrigin(req)||req.headers['x-war-imperium']!=='local')return send(403,{error:'Anfrage nicht erlaubt'});
+  if(!process.env.CLASH_API_KEY)return send(400,{error:'API-Schlüssel fehlt.'});
+  if(playerRankingJob?.running)return send(202,response());
+  if(playerRankingResult&&Date.now()-Date.parse(playerRankingResult.startedAt)<600000)return send(200,{...response(),cached:true});
+  const job={running:true,progress:{completed:0,total:0,hits:0},error:null};playerRankingJob=job;
+  scanPlayerRankings(path=>api(path,true),progress=>{job.progress=progress;}).then(async result=>{
+   await storage.write('player-rankings',result);playerRankingResult=result;job.running=false;
+  }).catch(()=>{job.running=false;job.error='Ranglistenprüfung fehlgeschlagen. API-Verbindung und Datenbank prüfen; die letzte gespeicherte Auswertung bleibt erhalten.';});
+  return send(202,response());
+ }
  if(req.method==='POST'&&req.url==='/api/member-profile'){
   if(!sameOrigin(req)||req.headers['x-war-imperium']!=='local')return send(403,{error:'Anfrage nicht erlaubt'});
   let body='';for await(const chunk of req){body+=chunk;if(body.length>4096)return send(413,{error:'Anfrage zu groß'});}
