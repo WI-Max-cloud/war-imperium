@@ -6,6 +6,7 @@ import {clanPlacements} from './rankings.mjs';
 import {createStorage} from './storage.mjs';
 import {authorized,sameOrigin} from './access.mjs';
 import {emptyLeagues,updateLeagues} from './leagues.mjs';
+import {prepareLeagues} from './league-core.mjs';
 const root=new URL('./',import.meta.url), data=new URL('./data/',root);
 const storage=createStorage({directory:data});
 if(process.env.RENDER==='true'&&(!process.env.APP_PASSWORD||process.env.APP_PASSWORD.length<16))throw Error('Für Render ein APP_PASSWORD mit mindestens 16 Zeichen setzen.');
@@ -28,7 +29,7 @@ export const server=http.createServer(async(req,res)=>{
  try{
  if(req.method==='GET'&&req.url==='/health')return send(200,{status:'ok'});
  if(!authorized(req.headers.authorization)){res.writeHead(401,{'WWW-Authenticate':'Basic realm="War Imperium", charset="UTF-8"','Cache-Control':'no-store'});res.end('Bitte mit deinem App-Zugang anmelden.');return;}
- if(req.method==='GET'&&req.url==='/api/leagues')return send(200,{state:await storage.read('leagues',emptyLeagues()),members:(await roster())?.members??[]});
+ if(req.method==='GET'&&req.url==='/api/leagues')return send(200,{state:prepareLeagues(await storage.read('leagues',emptyLeagues())),members:(await roster())?.members??[]});
  if(req.method==='POST'&&req.url==='/api/leagues'){
   if(!sameOrigin(req)||req.headers['x-war-imperium']!=='local')return send(403,{error:'Anfrage nicht erlaubt'});
   let body='';for await(const chunk of req){body+=chunk;if(body.length>4096)return send(413,{error:'Anfrage zu groß'});}
@@ -100,7 +101,7 @@ export const server=http.createServer(async(req,res)=>{
    return send(200,{imported:incoming.length,total:merged.size});
   }finally{busy=false;}
  }
- const files={'/':'index.html','/liga':'liga.html','/liga.html':'liga.html','/liga.mjs':'liga.mjs','/liga.css':'liga.css','/app.mjs':'app.mjs','/core.mjs':'core.mjs','/export.mjs':'export.mjs','/style.css':'style.css'};
+ const files={'/':'index.html','/liga':'liga.html','/liga.html':'liga.html','/liga.mjs':'liga.mjs','/liga.css':'liga.css','/league-core.mjs':'league-core.mjs','/app.mjs':'app.mjs','/core.mjs':'core.mjs','/export.mjs':'export.mjs','/style.css':'style.css'};
  if(req.method!=='GET'||!files[req.url])return send(404,{error:'Nicht gefunden'});
  res.writeHead(200,{'Content-Type':req.url.endsWith('.mjs')?'text/javascript':req.url.endsWith('.css')?'text/css':'text/html; charset=utf-8','Content-Security-Policy':"default-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'"});
  res.end(await readFile(new URL(files[req.url],root)));
