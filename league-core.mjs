@@ -1,4 +1,12 @@
 const pairingId=(a,b)=>[a,b].sort().join(':');
+export function leagueZones(leagueId,rank,total){
+ if(![1,2,3].includes(leagueId)||rank<1||rank>total)return [];
+ const zones=[];
+ if((leagueId===1&&rank<=4)||(leagueId!==1&&rank===1))zones.push('Finalsplatz');
+ if(leagueId>1&&rank<=3)zones.push('Aufstiegsplatz');
+ if(leagueId<3&&rank>total-3)zones.push('Abstiegsplatz');
+ return zones;
+}
 export function scheduleLeague(league){
  const players=league.players,results=new Map((league.matches??[]).map(m=>[m.id,m]));
  const ring=players.map(p=>p.id);if(ring.length<2)return {...league,matches:[]};

@@ -1,4 +1,4 @@
-import {leagueStandings} from './league-core.mjs';
+import {leagueStandings,leagueZones} from './league-core.mjs';
 const $=id=>document.getElementById(id);
 let state=null,busy=false;
 const openRounds=new Set();
@@ -45,12 +45,20 @@ function render(){
   const section=document.createElement('section');section.className='panel league-table';
   const heading=document.createElement('h2');heading.textContent=league.name;
   const count=document.createElement('small');count.textContent=`${league.players.length} Teilnehmer`;heading.append(count);section.append(heading);
+  const finalsLink=document.createElement('a');finalsLink.href='/finals';finalsLink.className='finals-link';finalsLink.textContent='War Imperium Finals';section.append(finalsLink);
+  const rules=document.createElement('p');rules.className='schedule-note';rules.textContent=league.id===1?'Finals: Plätze 1–4 · Abstieg: letzte 3 Plätze.':league.id===2?'Aufstieg: Plätze 1–3 · Finals: Platz 1 · Abstieg: letzte 3 Plätze.':'Aufstieg: Plätze 1–3 · Finals: Platz 1.';section.append(rules);
+  const provisional=document.createElement('p');provisional.className='schedule-note';provisional.textContent='Markierungen zeigen die Plätze nach aktuellem Tabellenstand. Auf- und Abstieg werden nicht automatisch durchgeführt.';
+  if(league.id===2&&league.players.length>0&&league.players.length<6)provisional.textContent+=' Bei weniger als 6 Teilnehmern überschneiden sich Aufstiegs- und Abstiegsplätze.';
+  section.append(provisional);
   if(!league.players.length){const empty=document.createElement('p');empty.className='league-empty';empty.textContent='Noch keine Teilnehmer. Füge oben den ersten Spieler hinzu.';section.append(empty);}
   else{
    const scroll=document.createElement('div');scroll.className='table';const table=document.createElement('table'),thead=document.createElement('thead'),tr=document.createElement('tr');
-   ['Platz','Spieler','Spiele','Punkte','Matchverhältnis','Verwalten'].forEach(value=>{const th=document.createElement('th');th.textContent=value;tr.append(th);});thead.append(tr);table.append(thead);
+   ['Platz','Spieler','Spiele','Punkte','Matchverhältnis','Qualifikation','Verwalten'].forEach(value=>{const th=document.createElement('th');th.textContent=value;tr.append(th);});thead.append(tr);table.append(thead);
    const body=document.createElement('tbody');
    leagueStandings(league).forEach((p,index)=>{const row=document.createElement('tr');[index+1,p.name,p.games,p.points,`${p.won}:${p.lost}`].forEach(value=>{const td=document.createElement('td');td.textContent=value;row.append(td);});
+    const qualifications=document.createElement('td');qualifications.className='qualification-cell';
+    for(const zone of leagueZones(league.id,index+1,league.players.length)){const badge=document.createElement('span');badge.className='qualification-badge '+(zone==='Finalsplatz'?'zone-finals':zone==='Aufstiegsplatz'?'zone-up':'zone-down');badge.textContent=zone;qualifications.append(badge);}
+    if(!qualifications.childNodes.length)qualifications.textContent='—';row.append(qualifications);
     const td=document.createElement('td'),button=document.createElement('button');button.type='button';button.className='remove-player';button.textContent='Entfernen';button.setAttribute('aria-label',`${p.name} aus ${league.name} entfernen`);
     button.onclick=()=>{if(!busy&&confirm(`${p.name} aus ${league.name} entfernen? Alle Begegnungen und Ergebnisse dieses Spielers werden dabei gelöscht und die Tabelle neu berechnet.`))mutate({action:'remove',leagueId:league.id,playerId:p.id});};td.append(button);row.append(td);body.append(row);
    });table.append(body);scroll.append(table);section.append(scroll);
