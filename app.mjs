@@ -143,22 +143,31 @@ const chartNote=document.createElement('p');chartNote.textContent='Summe der tat
 const chartHost=document.createElement('div');chartHost.className='trend-scroll';
 const chartRecord=document.createElement('p');chartRecord.className='chart-record';chartRecord.textContent='Wochenpunkte-Rekord: 140.300 Punkte';
 chartPanel.append(chartTitle,chartRecord,chartNote,chartHost);document.querySelector('aside').before(chartPanel);chartPanel.after(membershipPanel);
-const reportBar=document.createElement('div');reportBar.className='actions report-actions';
-const reportButton=document.createElement('button');reportButton.textContent='Clanbericht als PDF speichern';
-reportBar.append(reportButton);attendancePanel.before(reportBar);
-const reportSummary=document.createElement('p');reportSummary.className='report-summary';attendanceTitle.after(reportSummary);
-reportButton.onclick=()=>{
- if(attendanceTable.querySelector('input:disabled')){attendanceStatus.textContent='Bitte warten, bis die Abmeldung gespeichert ist.';return;}
- const details=chartHost.querySelector('details'),wasOpen=details?.open;
- const originalTitle=document.title;
- reportSummary.textContent=[demo?'DEMO – Erfundenes Beispiel':'War Imperium · Clan #22QJG0',`Fehlende Angriffe: Woche ${attendanceSelect.selectedOptions[0]?.textContent??'nicht verfügbar'}`,`Spielerfilter: ${memberToggle.checked?'Nur aktuell im Clan':'Alle damaligen Teilnehmer'}`,`Erstellt: ${new Date().toLocaleString('de-DE')}`].join(' · ');
- if(details)details.open=true;
- document.title=`War Imperium Clanbericht ${attendanceSelect.selectedOptions[0]?.textContent??''}`;
- document.body.classList.add('print-report');
- const restore=()=>{document.body.classList.remove('print-report');document.title=originalTitle;if(details)details.open=wasOpen;};
- window.addEventListener('afterprint',restore,{once:true});
+const clanPrintReport=document.createElement('div');clanPrintReport.id='clan-print-report';document.body.append(clanPrintReport);
+function printClanReport(){
+ if(!demo&&(attendanceTable.querySelector('input:disabled')||membershipTable.querySelector('button:disabled'))){$('status').textContent='Bitte warten, bis alle Änderungen gespeichert sind.';return;}
+ clanPrintReport.replaceChildren();
+ const title=document.createElement('h2');title.textContent='War Imperium · Clanbericht';
+ const summary=document.createElement('p');summary.textContent=exportMetadata().join(' · ');clanPrintReport.append(title,summary);
+ const panels=[document.querySelector('.player-points-panel'),chartPanel,attendancePanel,placementPanel,membershipPanel];
+ for(const [index,panel] of panels.entries()){
+  const copy=panel.cloneNode(true);copy.className='clan-print-section';
+  // Strip duplicate IDs and all editing controls from the print snapshot.
+  copy.removeAttribute('id');copy.querySelectorAll('[id]').forEach(el=>el.removeAttribute('id'));
+  copy.querySelectorAll('button,.actions,.filters,.mobile-trend,.print-summary,.report-summary,.join-date-status').forEach(el=>el.remove());
+  copy.querySelectorAll('details').forEach(details=>details.open=true);
+  if(index===0){const heading=document.createElement('h2');heading.textContent='Spielerpunkte';copy.prepend(heading);}
+  if(index===2){copy.querySelector('h2').textContent+=` · Woche ${attendanceSelect.selectedOptions[0]?.textContent??'nicht verfügbar'}`;copy.querySelectorAll(':scope > label').forEach(el=>el.remove());copy.querySelectorAll('.absence-check').forEach(label=>{const checked=label.querySelector('input')?.checked;label.textContent=checked?'Abgemeldet':'Nicht abgemeldet';});}
+  if(index===4){
+   const members=membershipRows(weeks,roster?.members??[],demo?{}:memberProfiles);
+   copy.querySelectorAll('tbody tr').forEach((row,i)=>{const form=row.querySelector('.join-date-form'),value=members[i]?.joinedOn;if(form)form.replaceWith(document.createTextNode(value?value.split('-').reverse().join('.'):'Unbekannt'));});
+  }
+  copy.querySelectorAll('input,select,summary').forEach(el=>el.remove());clanPrintReport.append(copy);
+ }
+ const originalTitle=document.title;document.title='War Imperium Clanbericht';document.body.classList.add('print-clan-report');
+ const restore=()=>{document.body.classList.remove('print-clan-report');document.title=originalTitle;clanPrintReport.replaceChildren();};window.addEventListener('afterprint',restore,{once:true});
  try{window.print();}catch(error){window.removeEventListener('afterprint',restore);restore();throw error;}
-};
+}
 function renderTrend(){
  const points=weeklyTrend(weeks);chartHost.replaceChildren();
 
@@ -203,10 +212,12 @@ exportBar.append(pdfButton);document.querySelector('.filters').before(exportBar)
 const printSummary=document.createElement('p');printSummary.className='print-summary';exportBar.after(printSummary);
 function selectedRows(){return filterMembers(rankings(weeks,$('week').value,Number($('window').value)),roster?.members,memberToggle.checked);}
 function exportMetadata(){return [demo?'DEMO – Erfundenes Beispiel':'War Imperium · Clan #22QJG0',$('week').selectedOptions[0]?.textContent??'',`Auswertung: ${$('window').selectedOptions[0].textContent}`,`Filter: ${memberToggle.checked?'Nur aktuell im Clan':'Alle historischen Teilnehmer'}`,demo?'Demo-Mitgliederliste':roster?`Mitgliederstand: ${new Date(roster.updatedAt).toLocaleString('de-DE')}`:'Kein Mitgliederstand',`Export: ${new Date().toLocaleString('de-DE')}`];}
-pdfButton.onclick=()=>{printSummary.textContent=exportMetadata().join(' · ');window.print();};
+pdfButton.onclick=printClanReport;
+const playerPointsPanel=document.querySelector('.panel');playerPointsPanel.classList.add('player-points-panel');
+playerPointsPanel.after(chartPanel,attendancePanel,placementPanel,membershipPanel,playerRankingPanel);
 function render(){renderAttendance();
  const rows=filterMembers(rankings(weeks,$('week').value,Number($('window').value)),roster?.members,memberToggle.checked);$('rows').replaceChildren();$('empty').hidden=rows.length>0;
- pdfButton.disabled=rows.length===0;
+ pdfButton.disabled=weeks.length===0&&!roster;
  memberStatus.textContent=demo?'Demo-Mitgliederliste (Beispieldaten).':roster?`Mitgliederliste: ${roster.members.length} Mitglieder · Stand ${new Date(roster.updatedAt).toLocaleString('de-DE')}. Wird beim API-Abruf aktualisiert.`:'Noch keine Mitgliederliste vorhanden. Bitte API-Daten abrufen oder den Filter ausschalten.';
  $('empty').textContent=weeks.length?'Keine passenden Spieler mit gespeicherten Kriegsdaten für diese Auswahl.':'Noch keine Daten. Starte mit der Demo oder richte den API-Schlüssel ein.';
  rows.forEach((r,i)=>{const tr=document.createElement('tr');[i+1,`${r.name} (${r.tag})`,r.value===null?'—':r.value.toLocaleString('de-DE',{maximumFractionDigits:1}),`${r.count} / ${r.available}`].forEach((v,column)=>{const td=document.createElement('td');td.textContent=v;if(column===2)td.className=`score-${scoreBand(r.value)}`;tr.append(td)});$('rows').append(tr)});
