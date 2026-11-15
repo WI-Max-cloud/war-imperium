@@ -1,10 +1,11 @@
 import {leagueStandings,leagueZones} from './league-core.mjs';
 const $=id=>document.getElementById(id);
-let state=null,busy=false,isAdmin=false;
+let state=null,busy=false,isAdmin=false,currentRole=null;
 const openRounds=new Set();
 const pdfRanges=new Map();
 const pdfReport=document.createElement('div');pdfReport.id='matchday-report';document.body.append(pdfReport);
 function printMatchdays(league,from,to){
+ if(currentRole==='vice')return;
  if(busy)return;
  const matches=(league.matches??[]).filter(m=>m.round>=from&&m.round<=to);
  if(!matches.length)return;
@@ -49,7 +50,7 @@ function renderSchedule(league,section){
  const title=document.createElement('h3');title.textContent='Spielplan · Jeder gegen jeden';section.append(title);
  const matches=league.matches??[],note=document.createElement('p');note.className='schedule-note';
  note.textContent=matches.length?`${matches.filter(m=>m.homeScore!==null).length} / ${matches.length} Spiele abgeschlossen · Jede Paarung genau einmal.`:'Ab zwei Teilnehmern wird der Spielplan automatisch erstellt.';section.append(note);
- section.append(matchdayExport(league));
+ if(currentRole!=='vice')section.append(matchdayExport(league));
  const names=new Map(league.players.map(p=>[p.id,p.name]));
  for(const round of [...new Set(matches.map(m=>m.round))]){
   const roundMatches=matches.filter(m=>m.round===round),details=document.createElement('details'),summary=document.createElement('summary'),key=`${league.id}-${round}`;
@@ -111,16 +112,16 @@ function render(){
 }
 async function load(){
  if(busy)return;toggleBusy(true);
- try{const response=await fetch('/api/leagues');const result=await response.json();if(!response.ok)throw Error(result.error||'Laden fehlgeschlagen');state=result.state;isAdmin=result.role==='admin';
-  document.getElementById('participant-form').hidden=!isAdmin;document.querySelector('.league-menu h2').textContent=isAdmin?'Teilnehmer verwalten':'Ligaübersicht';document.querySelectorAll('header a[href="/"]').forEach(a=>a.hidden=!isAdmin);
+ try{const response=await fetch('/api/leagues');const result=await response.json();if(!response.ok)throw Error(result.error||'Laden fehlgeschlagen');state=result.state;isAdmin=result.role==='admin';currentRole=result.role;
+  document.getElementById('participant-form').hidden=!isAdmin;document.querySelector('.league-menu h2').textContent=isAdmin?'Teilnehmer verwalten':'Ligaübersicht';document.querySelectorAll('header a[href="/"]').forEach(a=>a.hidden=currentRole==='player');
   $('clan-player').replaceChildren(new Option('Spieler manuell eingeben',''),...result.members.sort((a,b)=>a.name.localeCompare(b.name,'de')).map(p=>new Option(`${p.name} (${p.tag})`,JSON.stringify(p))));
   render();$('league-status').textContent='Teilnehmerlisten geladen.';
  }catch(e){$('league-status').textContent=`Teilnehmer konnten nicht geladen werden. ${e.message}`;}finally{toggleBusy(false);}
 }
 async function mutate(input){
  if(busy||!state)return;toggleBusy(true);$('league-status').textContent='Wird gespeichert …';
- try{const response=await fetch('/api/leagues',{method:'POST',headers:{'Content-Type':'application/json','X-War-Imperium':'local'},body:JSON.stringify({...input,revision:state.revision})});const result=await response.json();if(!response.ok)throw Error(result.error||'Speichern fehlgeschlagen');state=result.state;isAdmin=result.role==='admin';
-  document.getElementById('participant-form').hidden=!isAdmin;document.querySelector('.league-menu h2').textContent=isAdmin?'Teilnehmer verwalten':'Ligaübersicht';document.querySelectorAll('header a[href="/"]').forEach(a=>a.hidden=!isAdmin);render();
+ try{const response=await fetch('/api/leagues',{method:'POST',headers:{'Content-Type':'application/json','X-War-Imperium':'local'},body:JSON.stringify({...input,revision:state.revision})});const result=await response.json();if(!response.ok)throw Error(result.error||'Speichern fehlgeschlagen');state=result.state;isAdmin=result.role==='admin';currentRole=result.role;
+  document.getElementById('participant-form').hidden=!isAdmin;document.querySelector('.league-menu h2').textContent=isAdmin?'Teilnehmer verwalten':'Ligaübersicht';document.querySelectorAll('header a[href="/"]').forEach(a=>a.hidden=currentRole==='player');render();
   if(input.action==='add'){$('player-name').value='';$('player-tag').value='';$('clan-player').value='';}
   const messages={add:'Teilnehmer hinzugefügt, Spielplan aktualisiert und gespeichert.',remove:'Teilnehmer entfernt, Tabelle und Spielplan aktualisiert.',result:'Ergebnis gespeichert. Tabelle aktualisiert.',clearResult:'Ergebnis zurückgesetzt. Tabelle aktualisiert.'};
   $('league-status').textContent=messages[input.action];return true;

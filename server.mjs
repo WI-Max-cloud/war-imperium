@@ -4,7 +4,7 @@ import {fileURLToPath} from 'node:url';
 import {parseLog,demo} from './core.mjs';
 import {clanPlacements} from './rankings.mjs';
 import {createStorage} from './storage.mjs';
-import {accessRole,playerRouteAllowed,sameOrigin} from './access.mjs';
+import {accessRole,playerRouteAllowed,viceRouteAllowed,sameOrigin} from './access.mjs';
 import {emptyLeagues,updateLeagues} from './leagues.mjs';
 import {prepareLeagues} from './league-core.mjs';
 import {finalsPreview,resolveFinals,updateFinals} from './finals-core.mjs';
@@ -37,6 +37,7 @@ export const server=http.createServer(async(req,res)=>{
  const role=accessRole(req.headers.authorization);
  if(!role){res.writeHead(401,{'WWW-Authenticate':'Basic realm="War Imperium", charset="UTF-8"','Cache-Control':'no-store'});res.end('Bitte mit deinem App-Zugang anmelden.');return;}
  if(role==='player'&&!playerRouteAllowed(req.method,req.url))return send(403,{error:'Dieser Zugang ist nur für Liga, Finals und Ergebniseingabe freigeschaltet.'});
+ if(role==='vice'&&!viceRouteAllowed(req.method,req.url))return send(403,{error:'Mit diesem Zugang ist diese Funktion nicht freigeschaltet.'});
  if(role==='player'&&req.method==='GET'&&req.url==='/'){res.writeHead(302,{Location:'/liga','Cache-Control':'no-store'});res.end();return;}
  if((req.method==='GET'||req.method==='POST')&&req.url==='/api/player-rankings'){
   if(playerRankingResult===undefined)playerRankingResult=await storage.read('player-rankings',null);
@@ -68,7 +69,7 @@ export const server=http.createServer(async(req,res)=>{
   if(!sameOrigin(req)||req.headers['x-war-imperium']!=='local')return send(403,{error:'Anfrage nicht erlaubt'});
   let body='';for await(const chunk of req){body+=chunk;if(body.length>4096)return send(413,{error:'Anfrage zu groß'});}
   let input;try{input=JSON.parse(body);}catch{return send(400,{error:'Ungültige Eingabe'});}
-  if(role==='player'&&input?.action!=='result')return send(403,{error:'Mit diesem Zugang können nur Ergebnisse eingetragen oder geändert werden.'});
+  if(role!=='admin'&&input?.action!=='result')return send(403,{error:'Mit diesem Zugang können nur Ergebnisse eingetragen oder geändert werden.'});
   if(finalsBusy)return send(409,{error:'Speicherung läuft. Bitte erneut versuchen.'});finalsBusy=true;
   try{
    const current=await storage.read('finals',null);let next;
@@ -81,7 +82,7 @@ export const server=http.createServer(async(req,res)=>{
   if(!sameOrigin(req)||req.headers['x-war-imperium']!=='local')return send(403,{error:'Anfrage nicht erlaubt'});
   let body='';for await(const chunk of req){body+=chunk;if(body.length>4096)return send(413,{error:'Anfrage zu groß'});}
   let input;try{input=JSON.parse(body);}catch{return send(400,{error:'Ungültige Eingabe'});}
-  if(role==='player'&&input?.action!=='result')return send(403,{error:'Mit diesem Zugang können nur Ergebnisse eingetragen oder geändert werden.'});
+  if(role!=='admin'&&input?.action!=='result')return send(403,{error:'Mit diesem Zugang können nur Ergebnisse eingetragen oder geändert werden.'});
   if(leaguesBusy)return send(409,{error:'Speicherung läuft. Bitte erneut versuchen.'});leaguesBusy=true;
   try{
    const current=await storage.read('leagues',emptyLeagues());let next;
@@ -105,15 +106,19 @@ export const server=http.createServer(async(req,res)=>{
    return send(200,{excused});
   }finally{attendanceBusy=false;}
  }
+ if(req.method==='GET'&&req.url==='/api/placements'){
+  if(!placementCache)placementCache=await storage.read('clan-placements',null);
+  return send(200,placementCache??{updatedAt:null,location:null,results:[]});
+ }
  if(req.method==='POST' && req.url==='/api/placements'){
   if(!sameOrigin(req)||req.headers['x-war-imperium']!=='local')return send(403,{error:'Anfrage nicht erlaubt'});
   if(!process.env.CLASH_API_KEY)return send(400,{error:'API-Schlüssel fehlt. Bitte lokal einrichten.'});
   if(placementCache && Date.now()-Date.parse(placementCache.updatedAt)<600000)return send(200,placementCache);
-  if(!placementRequest)placementRequest=clanPlacements(path=>api(path,true)).then(value=>{placementCache=value;return value;}).finally(()=>{placementRequest=null;});
+  if(!placementRequest)placementRequest=clanPlacements(path=>api(path,true)).then(async value=>{await storage.write('clan-placements',value);placementCache=value;return value;}).finally(()=>{placementRequest=null;});
   return send(200,await placementRequest);
  }
- if(req.method==='GET' && req.url==='/api/history')return send(200,{weeks:await history(),roster:await roster(),absences:await absences(),memberProfiles:await storage.read('member-profiles',{}),configured:!!process.env.CLASH_API_KEY});
- if(req.method==='GET' && req.url==='/api/demo')return send(200,{weeks:demo(),roster:{updatedAt:null,members:demo()[0].players.slice(0,4).map(p=>({tag:p.tag,name:p.name}))}});
+ if(req.method==='GET' && req.url==='/api/history')return send(200,{role,weeks:await history(),roster:await roster(),absences:await absences(),memberProfiles:await storage.read('member-profiles',{}),configured:!!process.env.CLASH_API_KEY});
+ if(req.method==='GET' && req.url==='/api/demo')return send(200,{role,weeks:demo(),roster:{updatedAt:null,members:demo()[0].players.slice(0,4).map(p=>({tag:p.tag,name:p.name}))}});
  if(req.method==='POST' && req.url==='/api/sync'){
   if(!sameOrigin(req))return send(403,{error:'Fremder Ursprung abgelehnt'});
   if(req.headers['x-war-imperium']!=='local')return send(403,{error:'Lokale Anfrage erforderlich'});

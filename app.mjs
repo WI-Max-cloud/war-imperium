@@ -1,7 +1,7 @@
 import {rankings,filterMembers,weeklyTrend,attendanceWeeks,missingAttacks} from './core.mjs';
 import {scoreBand} from './export.mjs';
 import {membershipRows,berlinToday} from './membership.mjs';
-const $=id=>document.getElementById(id);let weeks=[],demo=false,roster=null;
+const $=id=>document.getElementById(id);let weeks=[],demo=false,roster=null,appRole='vice';
 const playerRankingPanel=document.createElement('section');playerRankingPanel.className='panel player-ranking-panel';
 const playerRankingTitle=document.createElement('h2');playerRankingTitle.textContent='War Imperium · Spieler in Ranglisten';
 const playerRankingNote=document.createElement('p');playerRankingNote.textContent='Prüft aktuelle Clanmitglieder in den weltweiten Trophäen-/Pfad-der-Legenden-Ranglisten, allen von der API gelieferten Ländern und Regionen sowie den angebotenen Modus- und globalen Turnierranglisten. Die Prüfung kann mehrere Minuten dauern. API-Listen sind begrenzt; fehlende Treffer beweisen keine fehlende Platzierung. Modusvarianten können frühere Saisons enthalten, wenn die API keinen Zeitraum ausweist.';
@@ -28,6 +28,7 @@ function showPlayerRankingResult(result){
  for(const board of result.coverage){const li=document.createElement('li');li.textContent=`${board.name} · ${board.region}: ${board.checked.toLocaleString('de-DE')} Einträge, ${board.hits} Treffer${board.error?' · '+board.error:board.checked===0?' · API-Liste leer':board.capped?' · API-begrenzte Regionsliste':''}`;list.append(li);}playerRankingDetails.append(list);
 }
 async function refreshPlayerRankings(start=false){
+ if(start&&appRole!=='admin')return;
  clearTimeout(playerRankingTimer);
  if(demo){playerRankingButton.disabled=true;playerRankingStatus.textContent='Im Demo-Modus werden keine echten Spieler-Ranglisten abgefragt.';showPlayerRankingResult(null);return;}
  playerRankingButton.disabled=true;
@@ -116,7 +117,7 @@ async function loadPlacements(){
  if(loadingPlacements)return;
  loadingPlacements=true;placementButton.disabled=true;placementStatus.textContent='Aktuelle Ranglisten werden geprüft …';
  try{
-  const response=await fetch('/api/placements',{method:'POST',headers:{'X-War-Imperium':'local'}});const result=await response.json();
+  const response=await fetch('/api/placements',appRole==='admin'?{method:'POST',headers:{'X-War-Imperium':'local'}}:{});const result=await response.json();
   if(demo)return;
   if(!response.ok)throw Error(result.error||'Ranglistenabruf fehlgeschlagen.');
   placementGrid.replaceChildren();
@@ -132,7 +133,7 @@ async function loadPlacements(){
    }
    placementGrid.append(card);
   }
-  placementStatus.textContent=`Stand: ${new Date(result.updatedAt).toLocaleString('de-DE')} · Clanregion: ${result.location??'Nicht verfügbar'}`;
+  placementStatus.textContent=result.updatedAt?`Stand: ${new Date(result.updatedAt).toLocaleString('de-DE')} · Clanregion: ${result.location??'Nicht verfügbar'}`:'Noch kein gespeicherter Clanranglistenstand. Ein Admin muss die Platzierungen zuerst aktualisieren.';
  }catch(e){if(!demo)placementStatus.textContent=`${e.message} Bereits angezeigte Werte bleiben vom vorherigen Abruf.`;}
  finally{loadingPlacements=false;placementButton.disabled=demo;}
 }
@@ -145,6 +146,7 @@ const chartRecord=document.createElement('p');chartRecord.className='chart-recor
 chartPanel.append(chartTitle,chartRecord,chartNote,chartHost);document.querySelector('aside').before(chartPanel);chartPanel.after(membershipPanel);
 const clanPrintReport=document.createElement('div');clanPrintReport.id='clan-print-report';document.body.append(clanPrintReport);
 function printClanReport(){
+ if(appRole!=='admin')return;
  if(!demo&&(attendanceTable.querySelector('input:disabled')||membershipTable.querySelector('button:disabled'))){$('status').textContent='Bitte warten, bis alle Änderungen gespeichert sind.';return;}
  clanPrintReport.replaceChildren();
  const title=document.createElement('h2');title.textContent='War Imperium · Clanbericht';
@@ -217,13 +219,13 @@ const playerPointsPanel=document.querySelector('.panel');playerPointsPanel.class
 playerPointsPanel.after(chartPanel,attendancePanel,placementPanel,membershipPanel,playerRankingPanel);
 function render(){renderAttendance();
  const rows=filterMembers(rankings(weeks,$('week').value,Number($('window').value)),roster?.members,memberToggle.checked);$('rows').replaceChildren();$('empty').hidden=rows.length>0;
- pdfButton.disabled=weeks.length===0&&!roster;
+ pdfButton.disabled=appRole!=='admin'||(weeks.length===0&&!roster);pdfButton.hidden=appRole!=='admin';$('sync').hidden=appRole!=='admin';placementButton.hidden=playerRankingButton.hidden=appRole!=='admin';
  memberStatus.textContent=demo?'Demo-Mitgliederliste (Beispieldaten).':roster?`Mitgliederliste: ${roster.members.length} Mitglieder · Stand ${new Date(roster.updatedAt).toLocaleString('de-DE')}. Wird beim API-Abruf aktualisiert.`:'Noch keine Mitgliederliste vorhanden. Bitte API-Daten abrufen oder den Filter ausschalten.';
  $('empty').textContent=weeks.length?'Keine passenden Spieler mit gespeicherten Kriegsdaten für diese Auswahl.':'Noch keine Daten. Starte mit der Demo oder richte den API-Schlüssel ein.';
  rows.forEach((r,i)=>{const tr=document.createElement('tr');[i+1,`${r.name} (${r.tag})`,r.value===null?'—':r.value.toLocaleString('de-DE',{maximumFractionDigits:1}),`${r.count} / ${r.available}`].forEach((v,column)=>{const td=document.createElement('td');td.textContent=v;if(column===2)td.className=`score-${scoreBand(r.value)}`;tr.append(td)});$('rows').append(tr)});
 }
-async function load(isDemo=false){const r=await fetch(isDemo?'/api/demo':'/api/history');const d=await r.json();weeks=d.weeks;demo=isDemo;roster=d.roster??null;if(!isDemo){savedAbsences=d.absences??{};memberProfiles=d.memberProfiles??{};}weeks.sort((a,b)=>b.season-a.season||b.section-a.section);$('week').replaceChildren(...weeks.map(w=>{const o=document.createElement('option');o.value=w.id;o.textContent=`${isDemo?'Demo · ':''}Saison ${w.season} · Woche ${w.section+1}`;return o}));$('status').textContent=isDemo?'DEMO · Erfundenes Beispiel, keine echten Clandaten.':`${weeks.length} gespeicherte Wochen. ${d.configured?'API-Schlüssel eingerichtet.':'API-Schlüssel fehlt noch.'}`;render();renderTrend();renderMembership();placementButton.disabled=demo;loadPlacements();refreshPlayerRankings();return d;}
-async function sync(){ $('sync').disabled=true;try{const r=await fetch('/api/sync',{method:'POST',headers:{'X-War-Imperium':'local'}});const d=await r.json();if(!r.ok)throw Error(d.error);await load();$('status').textContent=`Abruf erfolgreich: ${d.imported} verfügbare Wochen geprüft, ${d.total} lokal gespeichert.`;}catch(e){$('status').textContent=e.message;}finally{$('sync').disabled=false;}}
+async function load(isDemo=false){const r=await fetch(isDemo?'/api/demo':'/api/history');const d=await r.json();weeks=d.weeks;demo=isDemo;appRole=d.role??'vice';document.body.dataset.role=appRole;roster=d.roster??null;if(!isDemo){savedAbsences=d.absences??{};memberProfiles=d.memberProfiles??{};}weeks.sort((a,b)=>b.season-a.season||b.section-a.section);$('week').replaceChildren(...weeks.map(w=>{const o=document.createElement('option');o.value=w.id;o.textContent=`${isDemo?'Demo · ':''}Saison ${w.season} · Woche ${w.section+1}`;return o}));$('status').textContent=isDemo?'DEMO · Erfundenes Beispiel, keine echten Clandaten.':`${weeks.length} gespeicherte Wochen. ${d.configured?'API-Schlüssel eingerichtet.':'API-Schlüssel fehlt noch.'}`;render();renderTrend();renderMembership();placementButton.disabled=demo;loadPlacements();refreshPlayerRankings();return d;}
+async function sync(){if(appRole!=='admin')return; $('sync').disabled=true;try{const r=await fetch('/api/sync',{method:'POST',headers:{'X-War-Imperium':'local'}});const d=await r.json();if(!r.ok)throw Error(d.error);await load();$('status').textContent=`Abruf erfolgreich: ${d.imported} verfügbare Wochen geprüft, ${d.total} lokal gespeichert.`;}catch(e){$('status').textContent=e.message;}finally{$('sync').disabled=false;}}
 $('demo').onclick=()=>load(true).catch(showError);$('real').onclick=()=>load().catch(showError);$('sync').onclick=sync;$('week').onchange=render;$('window').onchange=render;
 function showError(){ $('status').textContent='Lokaler Server nicht erreichbar.'; }
-load().then(d=>{if(d.configured)sync()}).catch(showError);setInterval(()=>{if(!demo)sync()},3600000);
+load().then(d=>{if(d.configured&&appRole==='admin')sync()}).catch(showError);setInterval(()=>{if(!demo&&appRole==='admin')sync()},3600000);

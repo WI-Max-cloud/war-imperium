@@ -43,7 +43,7 @@ function render(){
  $('seeds-title').textContent=state?'Festgelegte Finals-Teilnehmer':'Teilnehmer nach aktuellem Ligastand';
  $('seed-note').textContent=state?`Start: ${new Date(state.startedAt).toLocaleString('de-DE')}. Die Teilnehmer bleiben fest, auch wenn sich die Ligatabellen später ändern.`:'Vor dem Start die sechs Plätze prüfen. Bei vollständiger Gleichheit gilt die bisherige alphabetische Tabellenreihenfolge.';
  for(const seed of state?.seeds??data.preview.slots){const card=node('article','finals-slot');card.append(node('h3','',`Liga ${seed.leagueId} · Platz ${seed.rank}`),node('strong','',seed.player?.name??'Noch nicht besetzt'),node('p','',seed.leagueId===1?'Upper Bracket · 0 Niederlagen zum Start':'Lower Bracket · 1 Niederlage angerechnet'));$('finals-slots').append(card);}
- $('start-finals').hidden=!!state;$('finals-bracket').replaceChildren();
+ $('start-finals').hidden=!!state||data.role!=='admin';document.querySelectorAll('header a[href="/"]').forEach(a=>a.hidden=data.role==='player');$('finals-bracket').replaceChildren();
  const matches=state?view.matches:finalsDefinitions.map(m=>({...m,home:null,away:null,homeSource:m.home,awaySource:m.away,active:m.id!==9,ready:false,homeScore:null,awayScore:null}));
  for(const group of [
   {title:'Upper Bracket',stages:[['Halbfinale',[1,2]],['Upper Final',[6]]]},

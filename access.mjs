@@ -6,9 +6,13 @@ export function accessRole(header,env=process.env){
  const supplied=Buffer.from(header.slice(6),'base64').toString('utf8');
  if(timingSafeEqual(digest(supplied),digest(`${env.APP_USER||'admin'}:${env.APP_PASSWORD}`)))return 'admin';
  if(env.PLAYER_PASSWORD&&timingSafeEqual(digest(supplied),digest(`${env.PLAYER_USER||'Spieler'}:${env.PLAYER_PASSWORD}`)))return 'player';
+ if(env.VICE_PASSWORD&&timingSafeEqual(digest(supplied),digest(`${env.VICE_USER||'Vize'}:${env.VICE_PASSWORD}`)))return 'vice';
  return null;
 }
 export const authorized=(header,env=process.env)=>!!accessRole(header,env);
+export function viceRouteAllowed(method,path){
+ return method==='GET'&&['/','/liga','/liga.html','/finals','/finals.html','/liga.mjs','/finals.mjs','/league-core.mjs','/finals-core.mjs','/style.css','/liga.css','/responsive.mjs','/app.mjs','/core.mjs','/export.mjs','/membership.mjs','/api/history','/api/demo','/api/leagues','/api/finals','/api/player-rankings','/api/placements'].includes(path)||method==='POST'&&['/api/leagues','/api/finals','/api/absence','/api/member-profile'].includes(path);
+}
 export function playerRouteAllowed(method,path){return method==='GET'&&['/','/liga','/liga.html','/finals','/finals.html','/liga.mjs','/finals.mjs','/league-core.mjs','/finals-core.mjs','/style.css','/liga.css','/responsive.mjs','/api/leagues','/api/finals'].includes(path)||method==='POST'&&['/api/leagues','/api/finals'].includes(path);}
 export function sameOrigin(req,env=process.env){
  if(!req.headers.origin)return true;

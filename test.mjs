@@ -13,6 +13,15 @@ import {leagueZones} from './league-core.mjs';
 import {accessRole,playerRouteAllowed} from './access.mjs';
 import {membershipRows,validJoinedOn} from './membership.mjs';
 import {scanPlayerRankings} from './player-rankings.mjs';
+import {viceRouteAllowed} from './access.mjs';
+test('Vize darf alle Ansichten, Ergebnisse, Abmeldungen und Datumsangaben, aber keine Administration',()=>{
+ const env={APP_USER:'admin',APP_PASSWORD:'admin-test',VICE_USER:'Vize',VICE_PASSWORD:'vice-test'};
+ assert.equal(accessRole('Basic '+Buffer.from('Vize:vice-test').toString('base64'),env),'vice');
+ for(const path of ['/','/liga','/finals','/api/history','/api/player-rankings','/api/placements'])assert.equal(viceRouteAllowed('GET',path),true);
+ for(const path of ['/api/leagues','/api/finals','/api/absence','/api/member-profile'])assert.equal(viceRouteAllowed('POST',path),true);
+ for(const path of ['/api/sync','/api/player-rankings','/api/placements','/api/pdf'])assert.equal(viceRouteAllowed('POST',path),false);
+ assert.equal(viceRouteAllowed('GET','/.env'),false);
+});
 test('Spielerranglisten prüfen alle entdeckten Regionen und Modi, verfolgen Seiten und melden Teilfehler',async()=>{
  const calls=[],progress=[];
  const result=await scanPlayerRankings(async path=>{
