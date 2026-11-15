@@ -4,12 +4,11 @@ import {membershipRows,berlinToday} from './membership.mjs';
 const $=id=>document.getElementById(id);let weeks=[],demo=false,roster=null,appRole='vice';
 const playerRankingPanel=document.createElement('section');playerRankingPanel.className='panel player-ranking-panel';
 const playerRankingTitle=document.createElement('h2');playerRankingTitle.textContent='War Imperium · Spieler in Ranglisten';
-const playerRankingNote=document.createElement('p');playerRankingNote.textContent='Prüft aktuelle Clanmitglieder in den weltweiten Trophäen-/Pfad-der-Legenden-Ranglisten, allen von der API gelieferten Ländern und Regionen sowie den angebotenen Modus- und globalen Turnierranglisten. Die Prüfung kann mehrere Minuten dauern. API-Listen sind begrenzt; fehlende Treffer beweisen keine fehlende Platzierung. Modusvarianten können frühere Saisons enthalten, wenn die API keinen Zeitraum ausweist.';
 const playerRankingButton=document.createElement('button');playerRankingButton.textContent='Alle Spieler-Ranglisten prüfen';
 const playerRankingStatus=document.createElement('p');playerRankingStatus.setAttribute('role','status');
 const playerRankingTable=document.createElement('div');playerRankingTable.className='table';
 const playerRankingDetails=document.createElement('details'),playerRankingDetailsTitle=document.createElement('summary');playerRankingDetailsTitle.textContent='Geprüfte Ranglisten und Einschränkungen';playerRankingDetails.append(playerRankingDetailsTitle);
-playerRankingPanel.append(playerRankingTitle,playerRankingNote,playerRankingButton,playerRankingStatus,playerRankingTable,playerRankingDetails);document.querySelector('aside').before(playerRankingPanel);
+playerRankingPanel.append(playerRankingTitle,playerRankingButton,playerRankingStatus,playerRankingTable,playerRankingDetails);document.querySelector('aside').before(playerRankingPanel);
 let playerRankingTimer=null;
 function showPlayerRankingResult(result){
  playerRankingTable.replaceChildren();playerRankingDetails.replaceChildren(playerRankingDetailsTitle);
@@ -43,9 +42,8 @@ playerRankingButton.onclick=()=>refreshPlayerRankings(true);
 let memberProfiles={};
 const membershipPanel=document.createElement('section');membershipPanel.className='panel member-tenure-panel';
 const membershipTitle=document.createElement('h2');membershipTitle.textContent='Mitglieder · Erster Clankrieg für War Imperium';
-const membershipNote=document.createElement('p');membershipNote.textContent='Nur aktuelle Mitglieder laut letztem API-Abruf. Das Datum des ersten Clankriegs für War Imperium wird manuell eingetragen. Sortierung: ältestes Datum zuerst, Mitglieder ohne Datum zuletzt. Die Zeitangabe wird ab diesem Datum berechnet und ist keine Angabe zur ununterbrochenen Clanmitgliedschaft.';
 const membershipStatus=document.createElement('p');membershipStatus.setAttribute('role','status');
-const membershipTable=document.createElement('div');membershipTable.className='table';membershipPanel.append(membershipTitle,membershipNote,membershipStatus,membershipTable);document.querySelector('aside').before(membershipPanel);
+const membershipTable=document.createElement('div');membershipTable.className='table';membershipPanel.append(membershipTitle,membershipStatus,membershipTable);document.querySelector('aside').before(membershipPanel);
 function renderMembership(){
  membershipTable.replaceChildren();
  if(!roster){membershipStatus.textContent='Bitte API-Daten abrufen, um die aktuelle Mitgliederliste zu laden.';return;}
@@ -73,12 +71,11 @@ function renderMembership(){
 let savedAbsences={},demoAbsences={};
 const attendancePanel=document.createElement('section');attendancePanel.className='panel attendance-panel';
 const attendanceTitle=document.createElement('h2');attendanceTitle.textContent='Fehlende Angriffe · Abmeldungen';
-const attendanceNote=document.createElement('p');attendanceNote.textContent='Ab Saison 137, Woche 3 (137/3). 1 bis 15 eingesetzte Kriegsdecks; Spieler mit 0 Angriffen werden ausgeblendet. „Abgemeldet“ gilt jeweils nur für diesen Spieler in dieser Woche. Der Filter „Nur aktuell im Clan“ aus der Spielerübersicht gilt auch hier. Nicht im API-Wochenprotokoll erfasste Spieler können nicht rückwirkend als 0 Angriffe ergänzt werden.';
 const attendanceLabel=document.createElement('label');attendanceLabel.textContent='Clankriegswoche';
 const attendanceSelect=document.createElement('select');attendanceLabel.append(attendanceSelect);
 const attendanceStatus=document.createElement('p');attendanceStatus.setAttribute('role','status');
 const attendanceTable=document.createElement('div');attendanceTable.className='table';
-attendancePanel.append(attendanceTitle,attendanceNote,attendanceLabel,attendanceStatus,attendanceTable);document.querySelector('.panel').after(attendancePanel);
+attendancePanel.append(attendanceTitle,attendanceLabel,attendanceStatus,attendanceTable);document.querySelector('.panel').after(attendancePanel);
 attendanceSelect.onchange=renderAttendance;
 function renderAttendance(){
  const eligible=attendanceWeeks(weeks),previous=attendanceSelect.value;
@@ -109,8 +106,7 @@ const placementTitle=document.createElement('h2');placementTitle.textContent='Ak
 const placementButton=document.createElement('button');placementButton.textContent='Platzierungen aktualisieren';
 const placementStatus=document.createElement('p');placementStatus.setAttribute('role','status');
 const placementGrid=document.createElement('div');placementGrid.className='placement-grid';
-const placementNote=document.createElement('p');placementNote.textContent='Weltweit und in der eingestellten Clanregion. API-Ranglisten können auf die vorderen Plätze begrenzt sein. Nicht aufgeführt bedeutet keine verfügbare Platznummer. Abrufe werden für 10 Minuten zwischengespeichert.';
-placementPanel.append(placementTitle,placementButton,placementStatus,placementGrid,placementNote);attendancePanel.after(placementPanel);placementPanel.after(playerRankingPanel);
+placementPanel.append(placementTitle,placementButton,placementStatus,placementGrid);attendancePanel.after(placementPanel);placementPanel.after(playerRankingPanel);
 let loadingPlacements=false;
 async function loadPlacements(){
  if(demo){placementGrid.replaceChildren();placementStatus.textContent='Im Demo-Modus werden keine echten Platzierungen abgerufen.';return;}
@@ -140,10 +136,9 @@ async function loadPlacements(){
 placementButton.onclick=loadPlacements;
 const chartPanel=document.createElement('section');chartPanel.className='panel trend-panel';
 const chartTitle=document.createElement('h2');chartTitle.textContent='Clanpunkte · Die letzten 10 Kriegswochen';
-const chartNote=document.createElement('p');chartNote.textContent='Summe der tatsächlich erzielten Spielerpunkte aller damaligen Teilnehmer, ohne 16er-Normalisierung. Unabhängig vom Mitgliederfilter und der Ranglistenauswahl. Datum = Abschlussdatum laut API-Kriegsprotokoll.';
 const chartHost=document.createElement('div');chartHost.className='trend-scroll';
 const chartRecord=document.createElement('p');chartRecord.className='chart-record';chartRecord.textContent='Wochenpunkte-Rekord: 140.300 Punkte';
-chartPanel.append(chartTitle,chartRecord,chartNote,chartHost);document.querySelector('aside').before(chartPanel);chartPanel.after(membershipPanel);
+chartPanel.append(chartTitle,chartRecord,chartHost);document.querySelector('aside').before(chartPanel);chartPanel.after(membershipPanel);
 const clanPrintReport=document.createElement('div');clanPrintReport.id='clan-print-report';document.body.append(clanPrintReport);
 function printClanReport(){
  if(appRole!=='admin')return;
@@ -181,7 +176,6 @@ function renderTrend(){
  const min=120000;
  const max=Math.max(min+1000,...points.map(p=>p.points));
  const axisMax=Math.ceil((max+(max-min)*0.15)/1000)*1000;
- chartNote.textContent='Punkteachse ab 120.000. Werte darunter sind am unteren Rand mit ↓ markiert. Summe der Originalpunkte aller damaligen Teilnehmer, ohne Normalisierung und unabhängig vom Mitgliederfilter. Datum = Abschlussdatum laut API-Kriegsprotokoll.';
  const svg=element('svg',{viewBox:`0 0 ${width} ${height}`,role:'img','aria-label':'Entwicklung der wöchentlichen Clanpunkte. Exakte Werte und Datumsangaben stehen auch in der Tabelle darunter.'});
  for(let i=0;i<=4;i++){const y=top+plotHeight-i*plotHeight/4;svg.append(element('line',{x1:left,y1:y,x2:width-right,y2:y,stroke:'#405361'}),element('text',{x:left-12,y:y+5,'text-anchor':'end',class:'chart-axis'},Math.round(min+(axisMax-min)*i/4).toLocaleString('de-DE')));}
  const coords=points.map((p,i)=>({x:points.length===1?left+plotWidth/2:left+i*plotWidth/(points.length-1),y:top+plotHeight-(Math.max(min,p.points)-min)/(axisMax-min)*plotHeight}));
