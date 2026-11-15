@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: war-imperium
+    runtime: node
+    plan: free
+    region: frankfurt
+    numInstances: 1
+    buildCommand: npm install --ignore-scripts
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: APP_USER
+        value: admin
+      - key: APP_PASSWORD
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: CLASH_API_KEY
+        sync: false
