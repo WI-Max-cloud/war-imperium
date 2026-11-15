@@ -11,6 +11,17 @@ import {emptyLeagues,updateLeagues} from './leagues.mjs';
 import {scheduleLeague,leagueStandings} from './league-core.mjs';
 import {leagueZones} from './league-core.mjs';
 import {accessRole,playerRouteAllowed} from './access.mjs';
+import {membershipRows,validJoinedOn} from './membership.mjs';
+test('Mitgliederhistorie zeigt nur aktuelle Mitglieder und ersten Krieg mit tatsächlichen Angriffen',()=>{
+ const weeks=[{season:138,section:0,date:'20261109T094306.000Z',players:[{tag:'#A',attacks:3}]},{season:137,section:2,players:[{tag:'#A',attacks:0}]},{season:137,section:3,players:[{tag:'#A',attacks:16},{tag:'#LEFT',attacks:16}]}];
+ const rows=membershipRows(weeks,[{tag:'#A',name:'A'},{tag:'#B',name:'B'}],{},'2026-11-15');
+ assert.equal(rows.length,2);assert.equal(rows[0].firstWar.season,137);assert.equal(rows[0].firstWar.section,3);assert.equal(rows[0].days,null);assert.equal(rows[1].firstWar,null);
+});
+test('Mitgliedsdauer beruht nur auf manuellem Datum und berücksichtigt Schaltjahre',()=>{
+ const rows=membershipRows([],[{tag:'#A',name:'A'}],{'#A':{joinedOn:'2024-02-28'}},'2024-03-01');assert.equal(rows[0].days,2);
+ assert.equal(membershipRows([],[{tag:'#A',name:'A'}],{},'2026-11-15')[0].days,null);
+ assert.equal(validJoinedOn('2026-02-30','2026-11-15'),false);assert.equal(validJoinedOn('2026-11-16','2026-11-15'),false);assert.equal(validJoinedOn('','2026-11-15'),true);assert.equal(validJoinedOn('2026-11-15','2026-11-15'),true);
+});
 test('Spielerzugang ist getrennt vom Verwalter und darf nur Turnierrouten öffnen',()=>{
  const env={APP_USER:'admin',APP_PASSWORD:'test-admin-password',PLAYER_USER:'Spieler',PLAYER_PASSWORD:'test-player-password'};
  assert.equal(accessRole('Basic '+Buffer.from('Spieler:test-player-password').toString('base64'),env),'player');

@@ -1,6 +1,36 @@
 import {rankings,filterMembers,weeklyTrend,attendanceWeeks,missingAttacks} from './core.mjs';
 import {scoreBand} from './export.mjs';
+import {membershipRows,berlinToday} from './membership.mjs';
 const $=id=>document.getElementById(id);let weeks=[],demo=false,roster=null;
+let memberProfiles={};
+const membershipPanel=document.createElement('section');membershipPanel.className='panel member-tenure-panel';
+const membershipTitle=document.createElement('h2');membershipTitle.textContent='Mitglieder · Beitritt und erster gespeicherter Clankrieg';
+const membershipNote=document.createElement('p');membershipNote.textContent='Nur aktuelle Mitglieder laut letztem API-Abruf. Das tatsächliche Beitrittsdatum ist in unseren API-Daten nicht enthalten und kann hier manuell ergänzt werden. Die Dauer bezieht sich ausschließlich auf dieses Datum. Der früheste Krieg im Archiv muss nicht der erste Krieg überhaupt sein; frühere Aufenthalte und Wiedereintritte sind daraus nicht erkennbar.';
+const membershipStatus=document.createElement('p');membershipStatus.setAttribute('role','status');
+const membershipTable=document.createElement('div');membershipTable.className='table';membershipPanel.append(membershipTitle,membershipNote,membershipStatus,membershipTable);document.querySelector('aside').before(membershipPanel);
+function renderMembership(){
+ membershipTable.replaceChildren();
+ if(!roster){membershipStatus.textContent='Bitte API-Daten abrufen, um die aktuelle Mitgliederliste zu laden.';return;}
+ membershipStatus.textContent=demo?'DEMO · Beitrittsdaten können hier nicht gespeichert werden.':`${roster.members.length} Mitglieder · Stand der Clanliste: ${new Date(roster.updatedAt).toLocaleString('de-DE')}`;
+ const table=document.createElement('table'),thead=document.createElement('thead'),head=document.createElement('tr');
+ ['Spieler','Beitrittsdatum (manuell)','Zeit seit Beitritt','Frühester gespielter Krieg im Archiv'].forEach(text=>{const th=document.createElement('th');th.textContent=text;head.append(th);});thead.append(head);table.append(thead);
+ const tbody=document.createElement('tbody');
+ for(const member of membershipRows(weeks,roster.members,demo?{}:memberProfiles)){
+  const tr=document.createElement('tr'),name=document.createElement('td');name.textContent=`${member.name} (${member.tag})`;tr.append(name);
+  const joined=document.createElement('td'),form=document.createElement('form');form.className='join-date-form';const input=document.createElement('input');input.type='date';input.min='2016-01-01';input.max=berlinToday();input.value=member.joinedOn;input.disabled=demo;input.setAttribute('aria-label',`Beitrittsdatum von ${member.name}`);
+  const save=document.createElement('button');save.type='submit';save.textContent='Speichern';save.disabled=demo;const feedback=document.createElement('span');feedback.className='join-date-status';feedback.setAttribute('role','status');
+  form.append(input,save,feedback);joined.append(form);tr.append(joined);
+  const duration=document.createElement('td');duration.textContent=member.days===null?'Unbekannt':`${member.days.toLocaleString('de-DE')} Tage`;tr.append(duration);
+  const first=document.createElement('td');if(member.firstWar){const w=member.firstWar;const date=/^\d{8}T/.test(w.date??'')?`${w.date.slice(6,8)}.${w.date.slice(4,6)}.${w.date.slice(0,4)}`:null;first.textContent=`${w.season}/${w.section+1}${date?' · Abschluss '+date:''}`;}else first.textContent='Kein gespielter Krieg im gespeicherten Archiv';tr.append(first);tbody.append(tr);
+  form.onsubmit=async event=>{
+   event.preventDefault();if(demo)return;input.disabled=save.disabled=true;feedback.textContent='Wird gespeichert …';
+   try{const response=await fetch('/api/member-profile',{method:'POST',headers:{'Content-Type':'application/json','X-War-Imperium':'local'},body:JSON.stringify({tag:member.tag,joinedOn:input.value})});const result=await response.json();if(!response.ok)throw Error(result.error||'Speichern fehlgeschlagen');memberProfiles[member.tag]=result.profile;
+    const updated=membershipRows(weeks,[member],memberProfiles)[0];duration.textContent=updated.days===null?'Unbekannt':`${updated.days.toLocaleString('de-DE')} Tage`;feedback.textContent=input.value?'Gespeichert':'Datum entfernt';
+   }catch(e){feedback.textContent=e.message;}finally{input.disabled=save.disabled=false;}
+  };
+ }
+ table.append(tbody);membershipTable.append(table);
+}
 let savedAbsences={},demoAbsences={};
 const attendancePanel=document.createElement('section');attendancePanel.className='panel attendance-panel';
 const attendanceTitle=document.createElement('h2');attendanceTitle.textContent='Fehlende Angriffe · Abmeldungen';
@@ -74,7 +104,7 @@ const chartTitle=document.createElement('h2');chartTitle.textContent='Clanpunkte
 const chartNote=document.createElement('p');chartNote.textContent='Summe der tatsächlich erzielten Spielerpunkte aller damaligen Teilnehmer, ohne 16er-Normalisierung. Unabhängig vom Mitgliederfilter und der Ranglistenauswahl. Datum = Abschlussdatum laut API-Kriegsprotokoll.';
 const chartHost=document.createElement('div');chartHost.className='trend-scroll';
 const chartRecord=document.createElement('p');chartRecord.className='chart-record';chartRecord.textContent='Wochenpunkte-Rekord: 140.300 Punkte';
-chartPanel.append(chartTitle,chartRecord,chartNote,chartHost);document.querySelector('aside').before(chartPanel);
+chartPanel.append(chartTitle,chartRecord,chartNote,chartHost);document.querySelector('aside').before(chartPanel);chartPanel.after(membershipPanel);
 const reportBar=document.createElement('div');reportBar.className='actions report-actions';
 const reportButton=document.createElement('button');reportButton.textContent='Clanbericht als PDF speichern';
 reportBar.append(reportButton);attendancePanel.before(reportBar);
@@ -143,7 +173,7 @@ function render(){renderAttendance();
  $('empty').textContent=weeks.length?'Keine passenden Spieler mit gespeicherten Kriegsdaten für diese Auswahl.':'Noch keine Daten. Starte mit der Demo oder richte den API-Schlüssel ein.';
  rows.forEach((r,i)=>{const tr=document.createElement('tr');[i+1,`${r.name} (${r.tag})`,r.value===null?'—':r.value.toLocaleString('de-DE',{maximumFractionDigits:1}),`${r.count} / ${r.available}`].forEach((v,column)=>{const td=document.createElement('td');td.textContent=v;if(column===2)td.className=`score-${scoreBand(r.value)}`;tr.append(td)});$('rows').append(tr)});
 }
-async function load(isDemo=false){const r=await fetch(isDemo?'/api/demo':'/api/history');const d=await r.json();weeks=d.weeks;demo=isDemo;roster=d.roster??null;if(!isDemo)savedAbsences=d.absences??{};weeks.sort((a,b)=>b.season-a.season||b.section-a.section);$('week').replaceChildren(...weeks.map(w=>{const o=document.createElement('option');o.value=w.id;o.textContent=`${isDemo?'Demo · ':''}Saison ${w.season} · Woche ${w.section+1}`;return o}));$('status').textContent=isDemo?'DEMO · Erfundenes Beispiel, keine echten Clandaten.':`${weeks.length} gespeicherte Wochen. ${d.configured?'API-Schlüssel eingerichtet.':'API-Schlüssel fehlt noch.'}`;render();renderTrend();placementButton.disabled=demo;loadPlacements();return d;}
+async function load(isDemo=false){const r=await fetch(isDemo?'/api/demo':'/api/history');const d=await r.json();weeks=d.weeks;demo=isDemo;roster=d.roster??null;if(!isDemo){savedAbsences=d.absences??{};memberProfiles=d.memberProfiles??{};}weeks.sort((a,b)=>b.season-a.season||b.section-a.section);$('week').replaceChildren(...weeks.map(w=>{const o=document.createElement('option');o.value=w.id;o.textContent=`${isDemo?'Demo · ':''}Saison ${w.season} · Woche ${w.section+1}`;return o}));$('status').textContent=isDemo?'DEMO · Erfundenes Beispiel, keine echten Clandaten.':`${weeks.length} gespeicherte Wochen. ${d.configured?'API-Schlüssel eingerichtet.':'API-Schlüssel fehlt noch.'}`;render();renderTrend();renderMembership();placementButton.disabled=demo;loadPlacements();return d;}
 async function sync(){ $('sync').disabled=true;try{const r=await fetch('/api/sync',{method:'POST',headers:{'X-War-Imperium':'local'}});const d=await r.json();if(!r.ok)throw Error(d.error);await load();$('status').textContent=`Abruf erfolgreich: ${d.imported} verfügbare Wochen geprüft, ${d.total} lokal gespeichert.`;}catch(e){$('status').textContent=e.message;}finally{$('sync').disabled=false;}}
 $('demo').onclick=()=>load(true).catch(showError);$('real').onclick=()=>load().catch(showError);$('sync').onclick=sync;$('week').onchange=render;$('window').onchange=render;
 function showError(){ $('status').textContent='Lokaler Server nicht erreichbar.'; }

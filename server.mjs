@@ -8,6 +8,7 @@ import {accessRole,playerRouteAllowed,sameOrigin} from './access.mjs';
 import {emptyLeagues,updateLeagues} from './leagues.mjs';
 import {prepareLeagues} from './league-core.mjs';
 import {finalsPreview,resolveFinals,updateFinals} from './finals-core.mjs';
+import {validJoinedOn} from './membership.mjs';
 const root=new URL('./',import.meta.url), data=new URL('./data/',root);
 const storage=createStorage({directory:data});
 if(process.env.RENDER==='true'&&(!process.env.APP_PASSWORD||process.env.APP_PASSWORD.length<16))throw Error('Für Render ein APP_PASSWORD mit mindestens 16 Zeichen setzen.');
@@ -15,6 +16,7 @@ let busy=false;
 let attendanceBusy=false;
 let leaguesBusy=false;
 let finalsBusy=false;
+let membershipBusy=false;
 async function absences(){return storage.read('absences',{});}
 async function history(){return storage.read('history',[]);}
 async function roster(){return storage.read('members',null);}
@@ -34,6 +36,15 @@ export const server=http.createServer(async(req,res)=>{
  if(!role){res.writeHead(401,{'WWW-Authenticate':'Basic realm="War Imperium", charset="UTF-8"','Cache-Control':'no-store'});res.end('Bitte mit deinem App-Zugang anmelden.');return;}
  if(role==='player'&&!playerRouteAllowed(req.method,req.url))return send(403,{error:'Dieser Zugang ist nur für Liga, Finals und Ergebniseingabe freigeschaltet.'});
  if(role==='player'&&req.method==='GET'&&req.url==='/'){res.writeHead(302,{Location:'/liga','Cache-Control':'no-store'});res.end();return;}
+ if(req.method==='POST'&&req.url==='/api/member-profile'){
+  if(!sameOrigin(req)||req.headers['x-war-imperium']!=='local')return send(403,{error:'Anfrage nicht erlaubt'});
+  let body='';for await(const chunk of req){body+=chunk;if(body.length>4096)return send(413,{error:'Anfrage zu groß'});}
+  let input;try{input=JSON.parse(body);}catch{return send(400,{error:'Ungültige Eingabe'});}
+  if(typeof input?.tag!=='string'||!validJoinedOn(input?.joinedOn))return send(400,{error:'Bitte ein gültiges Beitrittsdatum zwischen 2016 und heute eingeben oder das Feld leeren.'});
+  if(!(await roster())?.members.some(m=>m.tag===input.tag))return send(400,{error:'Dieses Mitglied ist nicht in der aktuellen gespeicherten Clanliste.'});
+  if(membershipBusy)return send(409,{error:'Speicherung läuft. Bitte erneut versuchen.'});membershipBusy=true;
+  try{const profiles=await storage.read('member-profiles',{});profiles[input.tag]={joinedOn:input.joinedOn,updatedAt:new Date().toISOString(),source:'manual'};await storage.write('member-profiles',profiles);return send(200,{profile:profiles[input.tag]});}finally{membershipBusy=false;}
+ }
  if(req.method==='GET'&&req.url==='/api/finals'){
   const state=await storage.read('finals',null);return send(200,{role,state,view:resolveFinals(state),preview:finalsPreview(await storage.read('leagues',emptyLeagues()))});
  }
@@ -85,7 +96,7 @@ export const server=http.createServer(async(req,res)=>{
   if(!placementRequest)placementRequest=clanPlacements(path=>api(path,true)).then(value=>{placementCache=value;return value;}).finally(()=>{placementRequest=null;});
   return send(200,await placementRequest);
  }
- if(req.method==='GET' && req.url==='/api/history')return send(200,{weeks:await history(),roster:await roster(),absences:await absences(),configured:!!process.env.CLASH_API_KEY});
+ if(req.method==='GET' && req.url==='/api/history')return send(200,{weeks:await history(),roster:await roster(),absences:await absences(),memberProfiles:await storage.read('member-profiles',{}),configured:!!process.env.CLASH_API_KEY});
  if(req.method==='GET' && req.url==='/api/demo')return send(200,{weeks:demo(),roster:{updatedAt:null,members:demo()[0].players.slice(0,4).map(p=>({tag:p.tag,name:p.name}))}});
  if(req.method==='POST' && req.url==='/api/sync'){
   if(!sameOrigin(req))return send(403,{error:'Fremder Ursprung abgelehnt'});
@@ -122,7 +133,7 @@ export const server=http.createServer(async(req,res)=>{
    return send(200,{imported:incoming.length,total:merged.size});
   }finally{busy=false;}
  }
- const files={'/':'index.html','/liga':'liga.html','/finals':'finals.html','/finals.html':'finals.html','/finals.mjs':'finals.mjs','/liga.html':'liga.html','/liga.mjs':'liga.mjs','/liga.css':'liga.css','/league-core.mjs':'league-core.mjs','/finals-core.mjs':'finals-core.mjs','/app.mjs':'app.mjs','/core.mjs':'core.mjs','/export.mjs':'export.mjs','/responsive.mjs':'responsive.mjs','/style.css':'style.css'};
+ const files={'/':'index.html','/liga':'liga.html','/finals':'finals.html','/finals.html':'finals.html','/finals.mjs':'finals.mjs','/liga.html':'liga.html','/liga.mjs':'liga.mjs','/liga.css':'liga.css','/league-core.mjs':'league-core.mjs','/finals-core.mjs':'finals-core.mjs','/app.mjs':'app.mjs','/core.mjs':'core.mjs','/membership.mjs':'membership.mjs','/export.mjs':'export.mjs','/responsive.mjs':'responsive.mjs','/style.css':'style.css'};
  if(req.method!=='GET'||!files[req.url])return send(404,{error:'Nicht gefunden'});
  res.writeHead(200,{'Content-Type':req.url.endsWith('.mjs')?'text/javascript':req.url.endsWith('.css')?'text/css':'text/html; charset=utf-8','Content-Security-Policy':"default-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'"});
  res.end(await readFile(new URL(files[req.url],root)));
