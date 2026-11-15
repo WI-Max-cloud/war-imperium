@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="de">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>War Imperium Liga</title>
+<link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/liga.css">
+<script type="module" src="/liga.mjs"></script>
+<body>
+<header><span>♜ WAR IMPERIUM</span><nav aria-label="Hauptnavigation"><a href="/">Clanmanager</a><a href="/liga" aria-current="page">Turniere</a></nav></header>
+<main>
+<p class="eyebrow">DREI LIGEN. EIN IMPERIUM.</p>
+<h1>War Imperium Liga</h1>
+<p>Teilnehmer einteilen und alle drei Ligen im Blick behalten.</p>
+<section class="panel league-menu">
+<h2>Teilnehmer verwalten</h2>
+<form id="participant-form">
+<label>Aus dem Clan auswählen (optional)<select id="clan-player"><option value="">Spieler manuell eingeben</option></select></label>
+<div class="league-form-row">
+<label>Liga<select id="league"><option value="1">Liga 1</option><option value="2">Liga 2</option><option value="3">Liga 3</option></select></label>
+<label>Spielername<input id="player-name" required maxlength="80" autocomplete="off" placeholder="Name des Teilnehmers"></label>
+<label>Spielertag (optional)<input id="player-tag" maxlength="16" autocomplete="off" placeholder="#…"></label>
+</div>
+<button id="add-player" type="submit" disabled>Teilnehmer hinzufügen</button>
+</form>
+<p id="league-status" role="status" aria-live="polite">Teilnehmer werden geladen …</p>
+<button id="reload-leagues" type="button">Listen neu laden</button>
+</section>
+<div id="league-tables" class="league-tables"></div>
+<p class="league-note">Die Tabellen zeigen zunächst die Teilnehmer in der Reihenfolge ihrer Aufnahme. Punkte, Spiele und Platzierungen folgen später.</p>
+<footer>War Imperium Liga · Clan #22QJG0</footer>
+</main>
+</body></html>
