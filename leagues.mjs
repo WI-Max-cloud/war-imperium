@@ -27,7 +27,7 @@ export function updateLeagues(state,input){
   else{
    const {homeScore,awayScore}=input;
    if(!Number.isInteger(homeScore)||!Number.isInteger(awayScore)||homeScore<0||awayScore<0||homeScore>99||awayScore>99)invalid('Ergebnis als ganze Zahlen zwischen 0 und 99 eingeben.');
-   if(homeScore===awayScore)invalid('Ein Spiel benötigt einen Sieger; Unentschieden sind nicht vorgesehen.');
+   if(homeScore===awayScore&&homeScore!==0)invalid('Ein Spiel benötigt einen Sieger. Nur 0:0 ist als Sonderwertung mit 0 Punkten für beide erlaubt.');
    match.homeScore=homeScore;match.awayScore=awayScore;
   }
  }

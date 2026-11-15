@@ -16,7 +16,7 @@ export function scheduleLeague(league){
   for(let i=0;i<ring.length/2;i++){
    const first=ring[i],second=ring[ring.length-1-i];if(!first||!second)continue;
    const [home,away]=[first,second].sort(),id=pairingId(home,away),old=results.get(id);
-   const played=old&&Number.isInteger(old.homeScore)&&Number.isInteger(old.awayScore)&&old.homeScore>=0&&old.awayScore>=0&&old.homeScore!==old.awayScore;
+   const played=old&&Number.isInteger(old.homeScore)&&Number.isInteger(old.awayScore)&&old.homeScore>=0&&old.awayScore>=0&&(old.homeScore!==old.awayScore||old.homeScore===0);
    matches.push({id,round,home,away,homeScore:played?old.homeScore:null,awayScore:played?old.awayScore:null});
   }
   ring.splice(1,0,ring.pop());
@@ -30,7 +30,7 @@ export function leagueStandings(league){
   if(match.homeScore===null||match.awayScore===null)continue;
   const home=rows.get(match.home),away=rows.get(match.away);home.games++;away.games++;
   home.won+=match.homeScore;home.lost+=match.awayScore;away.won+=match.awayScore;away.lost+=match.homeScore;
-  (match.homeScore>match.awayScore?home:away).points+=3;
+  if(match.homeScore!==match.awayScore)(match.homeScore>match.awayScore?home:away).points+=3;
  }
  return [...rows.values()].map(row=>({...row,difference:row.won-row.lost})).sort((a,b)=>b.points-a.points||b.difference-a.difference||b.won-a.won||a.name.localeCompare(b.name,'de')||a.id.localeCompare(b.id));
 }
