@@ -7,6 +7,67 @@ import {clanPlacements} from './rankings.mjs';
 import {attendanceWeeks,missingAttacks} from './core.mjs';
 import {authorized,sameOrigin} from './access.mjs';
 import {createStorage} from './storage.mjs';
+import {emptyLeagues,updateLeagues} from './leagues.mjs';
+import {scheduleLeague,leagueStandings} from './league-core.mjs';
+import {leagueZones} from './league-core.mjs';
+test('0:0 zählt als gespielt mit null Punkten für beide und bleibt beim Neuaufbau erhalten',()=>{
+ let state={revision:0,leagues:[{id:1,name:'Liga 1',players:[{id:'a',name:'A'},{id:'b',name:'B'}]}]};
+ state=updateLeagues(state,{action:'result',leagueId:1,matchId:'a:b',homeScore:0,awayScore:0,revision:0});
+ assert.equal(scheduleLeague(state.leagues[0]).matches[0].homeScore,0);
+ assert.deepEqual(leagueStandings(state.leagues[0]).map(p=>[p.games,p.points,p.won,p.lost]),[[1,0,0,0],[1,0,0,0]]);
+ state=updateLeagues(state,{action:'result',leagueId:1,matchId:'a:b',homeScore:2,awayScore:1,revision:1});
+ assert.equal(leagueStandings(state.leagues[0])[0].points,3);
+ state=updateLeagues(state,{action:'result',leagueId:1,matchId:'a:b',homeScore:0,awayScore:0,revision:2});
+ assert.ok(leagueStandings(state.leagues[0]).every(p=>p.games===1&&p.points===0&&p.won===0));
+ state=updateLeagues(state,{action:'clearResult',leagueId:1,matchId:'a:b',revision:3});
+ assert.equal(state.leagues[0].matches[0].homeScore,null);assert.ok(leagueStandings(state.leagues[0]).every(p=>p.games===0));
+});
+test('Aufstieg, Abstieg und Finalsplätze gelten pro Liga einschließlich Grenzplätzen',()=>{
+ assert.deepEqual(leagueZones(1,4,12),['Finalsplatz']);assert.deepEqual(leagueZones(1,5,12),[]);assert.deepEqual(leagueZones(1,9,12),[]);assert.deepEqual(leagueZones(1,10,12),['Abstiegsplatz']);
+ assert.deepEqual(leagueZones(2,1,12),['Finalsplatz','Aufstiegsplatz']);assert.deepEqual(leagueZones(2,3,12),['Aufstiegsplatz']);assert.deepEqual(leagueZones(2,4,12),[]);assert.deepEqual(leagueZones(2,10,12),['Abstiegsplatz']);
+ assert.deepEqual(leagueZones(3,1,12),['Finalsplatz','Aufstiegsplatz']);assert.deepEqual(leagueZones(3,3,12),['Aufstiegsplatz']);assert.deepEqual(leagueZones(3,12,12),[]);
+ assert.deepEqual(leagueZones(2,1,2),['Finalsplatz','Aufstiegsplatz','Abstiegsplatz']);assert.deepEqual(leagueZones(1,1,0),[]);
+});
+test('Jeder-gegen-jeden: jedes Paar genau einmal und pro Spieltag höchstens ein Spiel',()=>{
+ for(let count=0;count<=15;count++){
+  const league=scheduleLeague({players:Array.from({length:count},(_,i)=>({id:String(i),name:`P${i}`}))});
+  assert.equal(league.matches.length,Math.max(0,count*(count-1)/2));assert.equal(new Set(league.matches.map(m=>m.id)).size,league.matches.length);
+  for(const player of league.players)assert.equal(league.matches.filter(m=>m.home===player.id||m.away===player.id).length,Math.max(0,count-1));
+  for(const round of new Set(league.matches.map(m=>m.round))){const ids=league.matches.filter(m=>m.round===round).flatMap(m=>[m.home,m.away]);assert.equal(new Set(ids).size,ids.length);}
+ }
+});
+test('2:1 ergibt 3 Punkte, ein Spiel und spiegelbildliches Matchverhältnis; Änderung und Reset',()=>{
+ let state={revision:0,leagues:[{id:1,name:'Liga 1',players:[{id:'a',name:'Spieler 1'},{id:'b',name:'Spieler 2'}]}]};
+ state=updateLeagues(state,{action:'result',leagueId:1,matchId:'a:b',homeScore:2,awayScore:1,revision:0});
+ let rows=leagueStandings(state.leagues[0]);assert.deepEqual(rows.map(p=>[p.name,p.games,p.points,p.won,p.lost]),[['Spieler 1',1,3,2,1],['Spieler 2',1,0,1,2]]);
+ state=updateLeagues(state,{action:'result',leagueId:1,matchId:'a:b',homeScore:0,awayScore:2,revision:1});rows=leagueStandings(state.leagues[0]);assert.equal(rows[0].name,'Spieler 2');assert.equal(rows[0].games,1);assert.equal(rows[0].points,3);
+ state=updateLeagues(state,{action:'clearResult',leagueId:1,matchId:'a:b',revision:2});assert.ok(leagueStandings(state.leagues[0]).every(p=>p.games===0&&p.points===0&&p.won===0));
+});
+test('Ligatabelle sortiert nach Punkten, Differenz und gewonnenen Matches',()=>{
+ const league={players:[{id:'a',name:'A'},{id:'b',name:'B'},{id:'c',name:'C'}],matches:[{id:'a:b',homeScore:2,awayScore:0},{id:'b:c',homeScore:3,awayScore:0},{id:'a:c',homeScore:0,awayScore:1}]};
+ assert.deepEqual(leagueStandings(league).map(p=>[p.id,p.points,p.difference,p.won]),[['b',3,1,3],['a',3,1,2],['c',3,-2,1]]);
+});
+test('Neue Teilnehmer erhalten Begegnungen; alte Ergebnisse bleiben; Entfernen bereinigt Spiele',()=>{
+ let state={revision:0,leagues:[{id:1,name:'Liga 1',players:[{id:'a',name:'A'},{id:'b',name:'B'}],matches:[{id:'a:b',homeScore:2,awayScore:1}]}]};
+ state=updateLeagues(state,{action:'add',leagueId:1,name:'C',revision:0});assert.equal(state.leagues[0].matches.length,3);assert.equal(state.leagues[0].matches.find(m=>m.id==='a:b').homeScore,2);
+ assert.throws(()=>updateLeagues(state,{action:'result',leagueId:1,matchId:'a:b',homeScore:1,awayScore:1,revision:1}),/Sieger/);
+ assert.throws(()=>updateLeagues(state,{action:'result',leagueId:1,matchId:'a:b',homeScore:1.5,awayScore:0,revision:1}),/ganze Zahlen/);
+ state=updateLeagues(state,{action:'remove',leagueId:1,playerId:'a',revision:1});assert.equal(state.leagues[0].matches.length,1);assert.ok(leagueStandings(state.leagues[0]).every(p=>p.games===0));
+});
+test('Ligateilnehmer werden getrennt hinzugefügt und entfernt; Originalzustand bleibt erhalten',()=>{
+ const initial=emptyLeagues();let state=updateLeagues(initial,{action:'add',leagueId:2,name:' Max ',tag:'p0ly89',revision:0});
+ assert.equal(initial.leagues[1].players.length,0);assert.equal(state.leagues[0].players.length,0);assert.equal(state.leagues[1].players[0].name,'Max');assert.equal(state.leagues[1].players[0].tag,'#P0LY89');
+ const id=state.leagues[1].players[0].id;state=updateLeagues(state,{action:'remove',leagueId:2,playerId:id,revision:1});assert.equal(state.leagues[1].players.length,0);assert.equal(state.revision,2);
+});
+test('Liga-Eingaben verhindern Duplikate, ungültige Namen und veraltete Änderungen',()=>{
+ const initial=emptyLeagues(),state=updateLeagues(initial,{action:'add',leagueId:1,name:'Max',tag:'#P0LY89',revision:0});
+ assert.throws(()=>updateLeagues(state,{action:'add',leagueId:3,name:'Anderer Name',tag:'#P0LY89',revision:1}),/bereits/);
+ assert.throws(()=>updateLeagues(state,{action:'add',leagueId:3,name:'max',revision:1}),/bereits/);
+ assert.throws(()=>updateLeagues(state,{action:'add',leagueId:3,name:'Neu',revision:0}),e=>e.status===409);
+ assert.throws(()=>updateLeagues(initial,{action:'add',leagueId:1,name:' ',revision:0}),/Spielername/);
+ assert.throws(()=>updateLeagues(initial,{action:'add',leagueId:4,name:'Max',revision:0}),/gültige Liga/);
+ assert.throws(()=>updateLeagues(initial,{action:'add',leagueId:1,name:'Max',tag:'#bad tag',revision:0}),/Spielertag/);
+});
 test('Online-Zugang und HTTPS-Ursprung werden geprüft',()=>{
  const env={RENDER:'true',APP_USER:'admin',APP_PASSWORD:'example-test-only-password',RENDER_EXTERNAL_URL:'https://example.onrender.com'};
  assert.equal(authorized(undefined,env),false);
