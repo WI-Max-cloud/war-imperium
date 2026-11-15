@@ -14,8 +14,10 @@ async function absences(){return storage.read('absences',{});}
 async function history(){return storage.read('history',[]);}
 async function roster(){return storage.read('members',null);}
 let placementCache=null,placementRequest=null;
+if(process.env.CLASH_API_PROXY && process.env.CLASH_API_PROXY!=='royaleapi')throw Error('CLASH_API_PROXY muss leer oder royaleapi sein.');
+const clashApiOrigin=process.env.CLASH_API_PROXY==='royaleapi'?'https://proxy.royaleapi.dev':'https://api.clashroyale.com';
 async function api(path,absolute=false){
- const r=await fetch('https://api.clashroyale.com/v1/'+(absolute?'':'clans/%2322QJG0/')+path,{headers:{Authorization:`Bearer ${process.env.CLASH_API_KEY}`},signal:AbortSignal.timeout(20000)});
+ const r=await fetch(clashApiOrigin+'/v1/'+(absolute?'':'clans/%2322QJG0/')+path,{headers:{Authorization:`Bearer ${process.env.CLASH_API_KEY}`},redirect:'error',signal:AbortSignal.timeout(20000)});
  if(!r.ok)throw Error(({403:'API-Zugriff verweigert: Schlüssel und freigegebene öffentliche IP prüfen.',429:'API-Limit erreicht. Später erneut versuchen.',503:'Clash-Royale-API vorübergehend nicht verfügbar.'})[r.status]||`API antwortet mit Status ${r.status}`);
  return r.json();
 }
