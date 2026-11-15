@@ -5,7 +5,7 @@ const openRounds=new Set();
 const pdfRanges=new Map();
 const pdfReport=document.createElement('div');pdfReport.id='matchday-report';document.body.append(pdfReport);
 function printMatchdays(league,from,to){
- if(currentRole==='vice')return;
+ if(currentRole!=='admin')return;
  if(busy)return;
  const matches=(league.matches??[]).filter(m=>m.round>=from&&m.round<=to);
  if(!matches.length)return;
@@ -50,7 +50,7 @@ function renderSchedule(league,section){
  const title=document.createElement('h3');title.textContent='Spielplan · Jeder gegen jeden';section.append(title);
  const matches=league.matches??[],note=document.createElement('p');note.className='schedule-note';
  note.textContent=matches.length?`${matches.filter(m=>m.homeScore!==null).length} / ${matches.length} Spiele abgeschlossen · Jede Paarung genau einmal.`:'Ab zwei Teilnehmern wird der Spielplan automatisch erstellt.';section.append(note);
- if(currentRole!=='vice')section.append(matchdayExport(league));
+ if(currentRole==='admin')section.append(matchdayExport(league));
  const names=new Map(league.players.map(p=>[p.id,p.name]));
  for(const round of [...new Set(matches.map(m=>m.round))]){
   const roundMatches=matches.filter(m=>m.round===round),details=document.createElement('details'),summary=document.createElement('summary'),key=`${league.id}-${round}`;
