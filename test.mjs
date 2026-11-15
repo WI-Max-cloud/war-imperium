@@ -12,6 +12,12 @@ import {scheduleLeague,leagueStandings} from './league-core.mjs';
 import {leagueZones} from './league-core.mjs';
 import {accessRole,playerRouteAllowed} from './access.mjs';
 import {membershipRows,validJoinedOn} from './membership.mjs';
+test('Manuelle Kriegsdaten sortieren älteste zuerst und leere Daten zuletzt',()=>{
+ const members=[{tag:'#A',name:'A'},{tag:'#B',name:'B'},{tag:'#C',name:'C'},{tag:'#D',name:'D'}];
+ const profiles={'#A':{joinedOn:'2026-11-01'},'#B':{joinedOn:'2025-01-01'},'#D':{joinedOn:'2025-01-01'}};
+ assert.deepEqual(membershipRows([],members,profiles,'2026-11-15').map(m=>m.tag),['#B','#D','#A','#C']);
+ profiles['#C']={joinedOn:'2024-01-01'};assert.equal(membershipRows([],members,profiles,'2026-11-15')[0].tag,'#C');
+});
 test('Mitgliederhistorie zeigt nur aktuelle Mitglieder und ersten Krieg mit tatsächlichen Angriffen',()=>{
  const weeks=[{season:138,section:0,date:'20261109T094306.000Z',players:[{tag:'#A',attacks:3}]},{season:137,section:2,players:[{tag:'#A',attacks:0}]},{season:137,section:3,players:[{tag:'#A',attacks:16},{tag:'#LEFT',attacks:16}]}];
  const rows=membershipRows(weeks,[{tag:'#A',name:'A'},{tag:'#B',name:'B'}],{},'2026-11-15');

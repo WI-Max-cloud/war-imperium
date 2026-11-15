@@ -12,5 +12,9 @@ export function membershipRows(weeks,members,profiles={},today=berlinToday()){
   const joinedOn=profiles[member.tag]?.joinedOn??'';
   const days=joinedOn&&validJoinedOn(joinedOn,today)?Math.round((Date.parse(today+'T00:00:00Z')-Date.parse(joinedOn+'T00:00:00Z'))/86400000):null;
   return {...member,joinedOn,days,firstWar};
+ }).sort((a,b)=>{
+  if(a.days===null&&b.days!==null)return 1;
+  if(a.days!==null&&b.days===null)return -1;
+  return (a.days!==null&&b.days!==null?a.joinedOn.localeCompare(b.joinedOn):0)||a.name.localeCompare(b.name,'de');
  });
 }
