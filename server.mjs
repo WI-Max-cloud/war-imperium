@@ -5,7 +5,7 @@ import {parseLog,demo} from './core.mjs';
 import {clanPlacements} from './rankings.mjs';
 import {createStorage} from './storage.mjs';
 import {accessRole,canScore,publicRoute,sameOrigin} from './access.mjs';
-import {issuePlayerSession,sessionRole,sessionCookie} from './sessions.mjs';
+import {issueSession,sessionRole,sessionCookie} from './sessions.mjs';
 import {emptyLeagues,updateLeagues} from './leagues.mjs';
 import {prepareLeagues} from './league-core.mjs';
 import {finalsPreview,resolveFinals,updateFinals} from './finals-core.mjs';
@@ -36,7 +36,7 @@ export const server=http.createServer(async(req,res)=>{
  const send=(status,value)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify(value));};
  try{
  if(req.method==='GET'&&req.url==='/health')return send(200,{status:'ok'});
- const role=accessRole(req.headers.authorization)||sessionRole(req.headers.cookie)||'guest';
+ const role=sessionRole(req.headers.cookie)||(!process.env.APP_PASSWORD?accessRole(undefined):null)||'guest';
  if(req.method==='POST'&&['/api/login','/api/logout'].includes(req.url)){
   if(!sameOrigin(req)||req.headers['x-war-imperium']!=='local')return send(403,{error:'Anfrage nicht erlaubt'});
   if(req.url==='/api/logout'){res.setHeader('Set-Cookie',sessionCookie('',process.env.RENDER==='true'));return send(200,{role:'guest'});}
@@ -48,16 +48,17 @@ export const server=http.createServer(async(req,res)=>{
   let input;try{input=JSON.parse(body);}catch{return send(400,{error:'Ungültige Eingabe'});}
   if(typeof input?.username!=='string'||typeof input?.password!=='string')return send(400,{error:'Benutzername und Passwort erforderlich'});
   const candidate='Basic '+Buffer.from(input.username+':'+input.password).toString('base64');
-  if(accessRole(candidate)!=='player'){attempts.count++;loginAttempts.set(key,attempts);return send(401,{error:'Spieler-Benutzername oder Passwort nicht korrekt.'});}
-  loginAttempts.delete(key);res.setHeader('Set-Cookie',sessionCookie(issuePlayerSession(),process.env.RENDER==='true'));return send(200,{role:'player'});
+  const loginRole=accessRole(candidate);
+  if(!['admin','player'].includes(loginRole)||(input.admin===true&&loginRole!=='admin')){attempts.count++;loginAttempts.set(key,attempts);return send(401,{error:'Benutzername oder Passwort nicht korrekt.'});}
+  loginAttempts.delete(key);res.setHeader('Set-Cookie',sessionCookie(issueSession(loginRole),process.env.RENDER==='true'));return send(200,{role:loginRole});
  }
- if(req.method==='GET'&&req.url==='/api/session')return send(200,{role,canScore:canScore(role),playerUser:process.env.PLAYER_USER||'Spieler'});
+ if(req.method==='GET'&&req.url==='/api/session')return send(200,{role,canScore:canScore(role),playerUser:process.env.PLAYER_USER||'Spieler',adminUser:process.env.APP_USER||'admin'});
  const tournamentWrite=req.method==='POST'&&['/api/leagues','/api/finals'].includes(req.url);
  if(tournamentWrite&&!canScore(role))return send(403,{error:'Bitte zuerst über „Ergebnisse eintragen“ als Spieler anmelden.'});
  if(!publicRoute(req.method,req.url)&&!tournamentWrite&&role!=='admin'){
   if(req.url.startsWith('/api/'))return send(403,{error:'Dieser Bereich ist ausschließlich für den Admin freigeschaltet.'});
   if(!['/clankrieg','/clankrieg/'].includes(req.url))return send(404,{error:'Nicht gefunden'});
-  res.writeHead(401,{'WWW-Authenticate':'Basic realm="War Imperium Administration", charset="UTF-8"','Cache-Control':'no-store'});res.end('Clankrieg: Bitte mit dem Admin-Zugang anmelden.');return;
+  res.writeHead(302,{'Location':'/#admin-login','Cache-Control':'no-store'});res.end();return;
  }
  if(req.method==='GET'&&req.url==='/api/public-clan'){
   const summary=(await storage.read('clan-placements',null))?.publicClan;
@@ -178,7 +179,7 @@ export const server=http.createServer(async(req,res)=>{
    return send(200,{imported:incoming.length,total:merged.size});
   }finally{busy=false;}
  }
- const files={'/':'home.html','/index.html':'home.html','/home.css':'home.css','/home.mjs':'home.mjs','/home-hero.png':'home-hero.png','/crest.svg':'crest.svg','/clankrieg':'index.html','/clankrieg/':'index.html','/site-auth.mjs':'site-auth.mjs','/site-auth.css':'site-auth.css','/liga':'liga.html','/finals':'finals.html','/finals.html':'finals.html','/finals.mjs':'finals.mjs','/liga.html':'liga.html','/liga.mjs':'liga.mjs','/liga.css':'liga.css','/league-core.mjs':'league-core.mjs','/finals-core.mjs':'finals-core.mjs','/app.mjs':'app.mjs','/core.mjs':'core.mjs','/membership.mjs':'membership.mjs','/export.mjs':'export.mjs','/responsive.mjs':'responsive.mjs','/style.css':'style.css'};
+ const files={'/news':'news.html','/news.html':'news.html','/clan':'clan.html','/clan.html':'clan.html','/galerie':'galerie.html','/galerie.html':'galerie.html','/admin-auth.mjs':'admin-auth.mjs','/':'home.html','/index.html':'home.html','/home.css':'home.css','/home.mjs':'home.mjs','/home-hero.png':'home-hero.png','/crest.svg':'crest.svg','/clankrieg':'index.html','/clankrieg/':'index.html','/site-auth.mjs':'site-auth.mjs','/site-auth.css':'site-auth.css','/liga':'liga.html','/finals':'finals.html','/finals.html':'finals.html','/finals.mjs':'finals.mjs','/liga.html':'liga.html','/liga.mjs':'liga.mjs','/liga.css':'liga.css','/league-core.mjs':'league-core.mjs','/finals-core.mjs':'finals-core.mjs','/app.mjs':'app.mjs','/core.mjs':'core.mjs','/membership.mjs':'membership.mjs','/export.mjs':'export.mjs','/responsive.mjs':'responsive.mjs','/style.css':'style.css'};
  if(req.method!=='GET'||!files[req.url])return send(404,{error:'Nicht gefunden'});
  res.writeHead(200,{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Type':req.url.endsWith('.png')?'image/png':req.url.endsWith('.svg')?'image/svg+xml':req.url.endsWith('.mjs')?'text/javascript':req.url.endsWith('.css')?'text/css':'text/html; charset=utf-8','Content-Security-Policy':"default-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"});
  res.end(await readFile(new URL(files[req.url],root)));

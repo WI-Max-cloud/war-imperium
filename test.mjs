@@ -13,7 +13,7 @@ import {leagueZones} from './league-core.mjs';
 import {accessRole,publicRoute,canScore} from './access.mjs';
 import {membershipRows,validJoinedOn} from './membership.mjs';
 import {scanPlayerRankings} from './player-rankings.mjs';
-import {issuePlayerSession,sessionRole,sessionCookie} from './sessions.mjs';
+import {issueSession,issuePlayerSession,sessionRole,sessionCookie} from './sessions.mjs';
 test('Öffentliche Ansichten sind lesbar; die neue Rechteverteilung erlaubt nur Admin und Spieler Ergebnisse',()=>{
  const env={APP_USER:'admin',APP_PASSWORD:'admin-test',VICE_USER:'Vize',VICE_PASSWORD:'vice-test'};
  assert.equal(accessRole('Basic '+Buffer.from('Vize:vice-test').toString('base64'),env),'vice');
@@ -223,3 +223,13 @@ test('Mitgliederfilter nutzt Tags und verändert die Historie nicht',()=>{
 test('16er-Normalisierung und Nullangriffe',()=>{assert.equal(normalized(1001,3),5338);assert.equal(normalized(0,0),null);assert.equal(normalized(0,16),0)});
 test('Mittelwerte trennen Null und fehlende Teilnahme',()=>{const w=[{id:'a',season:2,section:0,players:[{tag:'#A',name:'A',points:1600,attacks:16}]},{id:'b',season:1,section:1,players:[{tag:'#A',name:'Alt',points:0,attacks:0}]},{id:'c',season:1,section:0,players:[{tag:'#A',name:'Alt',points:0,attacks:16}]}];assert.equal(rankings(w,'a',5)[0].value,800);assert.equal(rankings(w,'a',1)[0].value,1600)});
 test('Parser wählt Zielclan und lehnt fehlende Deckzahlen ab',()=>{const item={seasonId:1,sectionIndex:0,standings:[{clan:{tag:'#OTHER',participants:[]}},{clan:{tag:'#22QJG0',participants:[{tag:'#A',name:'A',fame:100,decksUsed:1}]}}]};assert.equal(parseLog([item])[0].players[0].points,100);delete item.standings[1].clan.participants[0].decksUsed;assert.throws(()=>parseLog([item]));});
+
+test('Admin-Sitzung erhält nur signierte Rechte und verfällt bei Passwortwechsel',()=>{
+ const env={APP_USER:'admin',APP_PASSWORD:'admin-session-test'},now=Date.now();
+ const token=issueSession('admin',env,now);assert.equal(sessionRole(sessionCookie(token),env,now),'admin');
+ assert.equal(sessionRole(sessionCookie(token),{...env,APP_PASSWORD:'rotated'},now),null);
+ assert.equal(sessionRole(sessionCookie(token),env,now+8*3600000+1),null);
+ const [payload,mac]=issueSession('player',{...env,PLAYER_PASSWORD:'test'},now).split('.');
+ const forged=Buffer.from(JSON.stringify({...JSON.parse(Buffer.from(payload,'base64url')),role:'admin',user:'admin'})).toString('base64url');
+ assert.equal(sessionRole('wi_player='+forged+'.'+mac,env,now),null);
+});
