@@ -11,7 +11,7 @@ export function accessRole(header,env=process.env){
 }
 export const authorized=(header,env=process.env)=>!!accessRole(header,env);
 export const canScore=role=>role==='admin'||role==='player';
-export function publicRoute(method,path){return method==='GET'&&['/news','/news.html','/clan','/clan.html','/galerie','/galerie.html','/admin-auth.mjs','/','/index.html','/home.css','/home.mjs','/home-hero.png','/crest.svg','/site-auth.mjs','/site-auth.css','/liga','/liga.html','/finals','/finals.html','/liga.mjs','/finals.mjs','/league-core.mjs','/finals-core.mjs','/style.css','/liga.css','/responsive.mjs','/api/leagues','/api/finals','/api/session','/api/public-clan'].includes(path);}
+export function publicRoute(method,path){return method==='GET'&&(/^\/api\/gallery-image\/[a-f0-9-]{36}$/.test(path)||['/api/content','/api/clan-public','/content-ui.mjs','/content.css','/membership.mjs','/news','/news.html','/clan','/clan.html','/galerie','/galerie.html','/admin-auth.mjs','/','/index.html','/home.css','/home.mjs','/home-hero.png','/crest.svg','/site-auth.mjs','/site-auth.css','/liga','/liga.html','/finals','/finals.html','/liga.mjs','/finals.mjs','/league-core.mjs','/finals-core.mjs','/style.css','/liga.css','/responsive.mjs','/api/leagues','/api/finals','/api/session','/api/public-clan'].includes(path));}
 export function sameOrigin(req,env=process.env){
  if(!req.headers.origin)return true;
  const expected=env.PUBLIC_ORIGIN||env.RENDER_EXTERNAL_URL||`http://${req.headers.host}`;

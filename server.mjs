@@ -1,3 +1,4 @@
+import {contentHandler} from './content-store.mjs';
 import http from 'node:http';
 import {readFile,writeFile,mkdir,rename} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
@@ -14,6 +15,7 @@ import {scanPlayerRankings} from './player-rankings.mjs';
 const root=new URL('./',import.meta.url), data=new URL('./data/',root);
 const storage=createStorage({directory:data});
 if(process.env.RENDER==='true'&&(!process.env.APP_PASSWORD||process.env.APP_PASSWORD.length<16))throw Error('Für Render ein APP_PASSWORD mit mindestens 16 Zeichen setzen.');
+const handleContent=contentHandler(storage);
 let busy=false;
 let attendanceBusy=false;
 let leaguesBusy=false;
@@ -60,7 +62,16 @@ export const server=http.createServer(async(req,res)=>{
   if(!['/clankrieg','/clankrieg/'].includes(req.url))return send(404,{error:'Nicht gefunden'});
   res.writeHead(302,{'Location':'/#admin-login','Cache-Control':'no-store'});res.end();return;
  }
+ if(req.url==='/api/content'||/^\/api\/gallery-image\/[a-f0-9-]{36}$/.test(req.url)){
+  if(req.method==='POST'&&(!sameOrigin(req)||req.headers['x-war-imperium']!=='local'))return send(403,{error:'Anfrage nicht erlaubt'});
+  if(req.method==='GET'||req.method==='POST')return await handleContent(req,res,role,send);
+ }
+ if(req.method==='GET'&&req.url==='/api/clan-public'){
+  const members=await roster(),profiles=await storage.read('member-profiles',{});
+  return send(200,{role,roster:members,profiles:Object.fromEntries((members?.members??[]).map(m=>[m.tag,{joinedOn:profiles[m.tag]?.joinedOn??''}])),placements:await storage.read('clan-placements',{updatedAt:null,results:[]})});
+ }
  if(req.method==='GET'&&req.url==='/api/public-clan'){
+
   const summary=(await storage.read('clan-placements',null))?.publicClan;
   const current=await roster();return send(200,{name:summary?.name||'War Imperium',tag:'#22QJG0',warTrophies:summary?.warTrophies??null,members:summary?.members??current?.members.length??null,updatedAt:summary?.updatedAt??current?.updatedAt??null});
  }
@@ -179,9 +190,9 @@ export const server=http.createServer(async(req,res)=>{
    return send(200,{imported:incoming.length,total:merged.size});
   }finally{busy=false;}
  }
- const files={'/news':'news.html','/news.html':'news.html','/clan':'clan.html','/clan.html':'clan.html','/galerie':'galerie.html','/galerie.html':'galerie.html','/admin-auth.mjs':'admin-auth.mjs','/':'home.html','/index.html':'home.html','/home.css':'home.css','/home.mjs':'home.mjs','/home-hero.png':'home-hero.png','/crest.svg':'crest.svg','/clankrieg':'index.html','/clankrieg/':'index.html','/site-auth.mjs':'site-auth.mjs','/site-auth.css':'site-auth.css','/liga':'liga.html','/finals':'finals.html','/finals.html':'finals.html','/finals.mjs':'finals.mjs','/liga.html':'liga.html','/liga.mjs':'liga.mjs','/liga.css':'liga.css','/league-core.mjs':'league-core.mjs','/finals-core.mjs':'finals-core.mjs','/app.mjs':'app.mjs','/core.mjs':'core.mjs','/membership.mjs':'membership.mjs','/export.mjs':'export.mjs','/responsive.mjs':'responsive.mjs','/style.css':'style.css'};
+ const files={'/content-ui.mjs':'content-ui.mjs','/content.css':'content.css','/membership.mjs':'membership.mjs','/news':'news.html','/news.html':'news.html','/clan':'clan.html','/clan.html':'clan.html','/galerie':'galerie.html','/galerie.html':'galerie.html','/admin-auth.mjs':'admin-auth.mjs','/':'home.html','/index.html':'home.html','/home.css':'home.css','/home.mjs':'home.mjs','/home-hero.png':'home-hero.png','/crest.svg':'crest.svg','/clankrieg':'index.html','/clankrieg/':'index.html','/site-auth.mjs':'site-auth.mjs','/site-auth.css':'site-auth.css','/liga':'liga.html','/finals':'finals.html','/finals.html':'finals.html','/finals.mjs':'finals.mjs','/liga.html':'liga.html','/liga.mjs':'liga.mjs','/liga.css':'liga.css','/league-core.mjs':'league-core.mjs','/finals-core.mjs':'finals-core.mjs','/app.mjs':'app.mjs','/core.mjs':'core.mjs','/membership.mjs':'membership.mjs','/export.mjs':'export.mjs','/responsive.mjs':'responsive.mjs','/style.css':'style.css'};
  if(req.method!=='GET'||!files[req.url])return send(404,{error:'Nicht gefunden'});
- res.writeHead(200,{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Type':req.url.endsWith('.png')?'image/png':req.url.endsWith('.svg')?'image/svg+xml':req.url.endsWith('.mjs')?'text/javascript':req.url.endsWith('.css')?'text/css':'text/html; charset=utf-8','Content-Security-Policy':"default-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"});
+ res.writeHead(200,{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Type':req.url.endsWith('.png')?'image/png':req.url.endsWith('.svg')?'image/svg+xml':req.url.endsWith('.mjs')?'text/javascript':req.url.endsWith('.css')?'text/css':'text/html; charset=utf-8','Content-Security-Policy':"default-src 'self'; img-src 'self' blob:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"});
  res.end(await readFile(new URL(files[req.url],root)));
  }catch(e){send(500,{error:e.message?.startsWith('API')||e.message?.includes('fehlen')?e.message:'Abruf oder Speicherung fehlgeschlagen. Verbindung und lokales Datenverzeichnis prüfen.'});}
 });
