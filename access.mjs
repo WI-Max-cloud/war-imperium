@@ -10,10 +10,8 @@ export function accessRole(header,env=process.env){
  return null;
 }
 export const authorized=(header,env=process.env)=>!!accessRole(header,env);
-export function viceRouteAllowed(method,path){
- return method==='GET'&&['/','/liga','/liga.html','/finals','/finals.html','/liga.mjs','/finals.mjs','/league-core.mjs','/finals-core.mjs','/style.css','/liga.css','/responsive.mjs','/app.mjs','/core.mjs','/export.mjs','/membership.mjs','/api/history','/api/demo','/api/leagues','/api/finals','/api/player-rankings','/api/placements'].includes(path)||method==='POST'&&['/api/leagues','/api/finals','/api/absence','/api/member-profile'].includes(path);
-}
-export function playerRouteAllowed(method,path){return method==='GET'&&['/','/liga','/liga.html','/finals','/finals.html','/liga.mjs','/finals.mjs','/league-core.mjs','/finals-core.mjs','/style.css','/liga.css','/responsive.mjs','/api/leagues','/api/finals'].includes(path)||method==='POST'&&['/api/leagues','/api/finals'].includes(path);}
+export const canScore=role=>role==='admin'||role==='player';
+export function publicRoute(method,path){return method==='GET'&&['/','/index.html','/home.css','/home.mjs','/home-hero.png','/crest.svg','/site-auth.mjs','/site-auth.css','/liga','/liga.html','/finals','/finals.html','/liga.mjs','/finals.mjs','/league-core.mjs','/finals-core.mjs','/style.css','/liga.css','/responsive.mjs','/api/leagues','/api/finals','/api/session','/api/public-clan'].includes(path);}
 export function sameOrigin(req,env=process.env){
  if(!req.headers.origin)return true;
  const expected=env.PUBLIC_ORIGIN||env.RENDER_EXTERNAL_URL||`http://${req.headers.host}`;

@@ -10,17 +10,23 @@ import {createStorage} from './storage.mjs';
 import {emptyLeagues,updateLeagues} from './leagues.mjs';
 import {scheduleLeague,leagueStandings} from './league-core.mjs';
 import {leagueZones} from './league-core.mjs';
-import {accessRole,playerRouteAllowed} from './access.mjs';
+import {accessRole,publicRoute,canScore} from './access.mjs';
 import {membershipRows,validJoinedOn} from './membership.mjs';
 import {scanPlayerRankings} from './player-rankings.mjs';
-import {viceRouteAllowed} from './access.mjs';
-test('Vize darf alle Ansichten, Ergebnisse, Abmeldungen und Datumsangaben, aber keine Administration',()=>{
+import {issuePlayerSession,sessionRole,sessionCookie} from './sessions.mjs';
+test('Öffentliche Ansichten sind lesbar; die neue Rechteverteilung erlaubt nur Admin und Spieler Ergebnisse',()=>{
  const env={APP_USER:'admin',APP_PASSWORD:'admin-test',VICE_USER:'Vize',VICE_PASSWORD:'vice-test'};
  assert.equal(accessRole('Basic '+Buffer.from('Vize:vice-test').toString('base64'),env),'vice');
- for(const path of ['/','/liga','/finals','/api/history','/api/player-rankings','/api/placements'])assert.equal(viceRouteAllowed('GET',path),true);
- for(const path of ['/api/leagues','/api/finals','/api/absence','/api/member-profile'])assert.equal(viceRouteAllowed('POST',path),true);
- for(const path of ['/api/sync','/api/player-rankings','/api/placements','/api/pdf'])assert.equal(viceRouteAllowed('POST',path),false);
- assert.equal(viceRouteAllowed('GET','/.env'),false);
+ for(const path of ['/','/liga','/finals','/home.css','/site-auth.mjs','/api/leagues','/api/finals'])assert.equal(publicRoute('GET',path),true);
+ for(const path of ['/clankrieg','/api/history','/api/member-profile','/api/player-rankings'])assert.equal(publicRoute('GET',path),false);
+ assert.equal(publicRoute('POST','/api/leagues'),false);assert.equal(canScore('vice'),false);assert.equal(canScore('guest'),false);assert.equal(canScore('player'),true);assert.equal(canScore('admin'),true);
+});
+test('Spielersitzungen sind signiert, zeitlich begrenzt und nach Passwortänderung ungültig',()=>{
+ const env={APP_PASSWORD:'admin-test-secret',PLAYER_USER:'Spieler',PLAYER_PASSWORD:'player-test'};
+ const now=Date.now(),token=issuePlayerSession(env,now),cookie=sessionCookie(token,true);
+ assert.equal(sessionRole(cookie,env,now),'player');assert.ok(cookie.includes('HttpOnly'));assert.ok(cookie.includes('Secure'));assert.ok(cookie.includes('SameSite=Strict'));
+ assert.equal(sessionRole(cookie,env,now+8*3600000+1),null);assert.equal(sessionRole(cookie,{...env,PLAYER_PASSWORD:'changed'},now),null);
+ assert.equal(sessionRole('wi_player='+token.slice(0,-1)+'x',env,now),null);assert.equal(sessionRole('wi_player=broken',env,now),null);
 });
 test('Spielerranglisten prüfen alle entdeckten Regionen und Modi, verfolgen Seiten und melden Teilfehler',async()=>{
  const calls=[],progress=[];
@@ -71,8 +77,8 @@ test('Spielerzugang ist getrennt vom Verwalter und darf nur Turnierrouten öffne
  assert.equal(accessRole('Basic '+Buffer.from('Spieler:test-player-password').toString('base64'),env),'player');
  assert.equal(accessRole('Basic '+Buffer.from('admin:test-admin-password').toString('base64'),env),'admin');
  assert.equal(accessRole('Basic '+Buffer.from('Spieler:wrong').toString('base64'),env),null);
- for(const path of ['/api/history','/api/demo','/api/sync','/api/absence','/api/placements','/app.mjs','/.env'])assert.equal(playerRouteAllowed('GET',path),false);
- assert.equal(playerRouteAllowed('GET','/liga'),true);assert.equal(playerRouteAllowed('GET','/finals'),true);assert.equal(playerRouteAllowed('POST','/api/leagues'),true);
+ for(const path of ['/api/history','/api/demo','/api/sync','/api/absence','/api/placements','/app.mjs','/.env'])assert.equal(publicRoute('GET',path),false);
+ assert.equal(publicRoute('GET','/liga'),true);assert.equal(publicRoute('GET','/finals'),true);assert.equal(canScore('player'),true);
 });
 test('0:0 zählt als gespielt mit null Punkten für beide und bleibt beim Neuaufbau erhalten',()=>{
  let state={revision:0,leagues:[{id:1,name:'Liga 1',players:[{id:'a',name:'A'},{id:'b',name:'B'}]}]};

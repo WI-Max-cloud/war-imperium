@@ -2,17 +2,17 @@
 <html lang="de">
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>War Imperium Liga</title>
-<link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/liga.css">
+<link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/liga.css"><link rel="stylesheet" href="/site-auth.css"><script type="module" src="/site-auth.mjs"></script>
 <script type="module" src="/liga.mjs"></script>
 <body><script type="module" src="/responsive.mjs"></script>
-<header><span>♜ WAR IMPERIUM</span><nav aria-label="Hauptnavigation"><a href="/">Clanmanager</a><a href="/liga" aria-current="page">Turniere</a></nav></header>
+<header><span>♜ WAR IMPERIUM</span><nav aria-label="Hauptnavigation"><a href="/">Home</a><a href="/clankrieg">Clankrieg</a><a href="/liga" aria-current="page">Turniere</a></nav></header>
 <main>
 <p class="eyebrow">DREI LIGEN. EIN IMPERIUM.</p>
 <h1>War Imperium Liga</h1>
 <p>Teilnehmer einteilen und alle drei Ligen im Blick behalten.</p>
 <section class="panel league-menu">
-<h2>Teilnehmer verwalten</h2>
-<form id="participant-form">
+<h2>Ligaübersicht</h2>
+<form id="participant-form" hidden>
 <label>Aus dem Clan auswählen (optional)<select id="clan-player"><option value="">Spieler manuell eingeben</option></select></label>
 <div class="league-form-row">
 <label>Liga<select id="league"><option value="1">Liga 1</option><option value="2">Liga 2</option><option value="3">Liga 3</option></select></label>

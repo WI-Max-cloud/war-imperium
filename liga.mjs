@@ -1,6 +1,6 @@
 import {leagueStandings,leagueZones} from './league-core.mjs';
 const $=id=>document.getElementById(id);
-let state=null,busy=false,isAdmin=false,currentRole=null;
+let state=null,busy=false,isAdmin=false,currentRole=null,canEnterResults=false;
 const openRounds=new Set();
 const pdfRanges=new Map();
 const pdfReport=document.createElement('div');pdfReport.id='matchday-report';document.body.append(pdfReport);
@@ -45,7 +45,7 @@ function matchdayExport(league){
  from.disabled=to.disabled=button.disabled=rounds.length===0;
  button.onclick=()=>printMatchdays(state.leagues.find(l=>l.id===league.id),Number(from.value),Number(to.value));menu.append(button,note);return menu;
 }
-function toggleBusy(value){busy=value;$('add-player').disabled=value||!state;$('reload-leagues').disabled=value;document.querySelectorAll('.remove-player,.match-save,.match-reset,.match-score').forEach(b=>b.disabled=value);}
+function toggleBusy(value){busy=value;$('add-player').disabled=value||!state||!isAdmin;$('reload-leagues').disabled=value;document.querySelectorAll('.remove-player,.match-reset').forEach(b=>b.disabled=value||!isAdmin);document.querySelectorAll('.match-save,.match-score').forEach(b=>b.disabled=value||!canEnterResults);}
 function renderSchedule(league,section){
  const title=document.createElement('h3');title.textContent='Spielplan · Jeder gegen jeden';section.append(title);
  const matches=league.matches??[],note=document.createElement('p');note.className='schedule-note';
@@ -59,6 +59,7 @@ function renderSchedule(league,section){
   summary.textContent=`Spieltag ${round} · ${roundMatches.filter(m=>m.homeScore!==null).length} / ${roundMatches.length} abgeschlossen`;
   details.append(summary);
   for(const match of roundMatches){
+   if(!canEnterResults){const result=document.createElement('p');result.className='public-match-result';result.textContent=`${names.get(match.home)} — ${names.get(match.away)} · ${match.homeScore===null?'Noch offen':match.homeScore+':'+match.awayScore}`;details.append(result);continue;}
    const form=document.createElement('form');form.className='match-form';
    const homeLabel=document.createElement('label'),awayLabel=document.createElement('label');
    homeLabel.textContent=names.get(match.home);awayLabel.textContent=names.get(match.away);
@@ -94,7 +95,7 @@ function render(){
   const provisional=document.createElement('p');provisional.className='schedule-note';provisional.textContent='Markierungen zeigen die Plätze nach aktuellem Tabellenstand. Auf- und Abstieg werden nicht automatisch durchgeführt.';
   if(league.id===2&&league.players.length>0&&league.players.length<6)provisional.textContent+=' Bei weniger als 6 Teilnehmern überschneiden sich Aufstiegs- und Abstiegsplätze.';
   section.append(provisional);
-  if(!league.players.length){const empty=document.createElement('p');empty.className='league-empty';empty.textContent='Noch keine Teilnehmer. Füge oben den ersten Spieler hinzu.';section.append(empty);}
+  if(!league.players.length){const empty=document.createElement('p');empty.className='league-empty';empty.textContent=isAdmin?'Noch keine Teilnehmer. Füge oben den ersten Spieler hinzu.':'Noch keine Teilnehmer für diese Liga eingetragen.';section.append(empty);}
   else{
    const scroll=document.createElement('div');scroll.className='table';const table=document.createElement('table'),thead=document.createElement('thead'),tr=document.createElement('tr');
    ['Platz','Spieler','Spiele','Punkte','Matchverhältnis','Qualifikation',...(isAdmin?['Verwalten']:[])].forEach(value=>{const th=document.createElement('th');th.textContent=value;tr.append(th);});thead.append(tr);table.append(thead);
@@ -112,16 +113,16 @@ function render(){
 }
 async function load(){
  if(busy)return;toggleBusy(true);
- try{const response=await fetch('/api/leagues');const result=await response.json();if(!response.ok)throw Error(result.error||'Laden fehlgeschlagen');state=result.state;isAdmin=result.role==='admin';currentRole=result.role;
-  document.getElementById('participant-form').hidden=!isAdmin;document.querySelector('.league-menu h2').textContent=isAdmin?'Teilnehmer verwalten':'Ligaübersicht';document.querySelectorAll('header a[href="/"]').forEach(a=>a.hidden=currentRole==='player');
+ try{const response=await fetch('/api/leagues');const result=await response.json();if(!response.ok)throw Error(result.error||'Laden fehlgeschlagen');state=result.state;isAdmin=result.role==='admin';currentRole=result.role;canEnterResults=currentRole==='admin'||currentRole==='player';
+  document.getElementById('participant-form').hidden=!isAdmin;document.querySelector('.league-menu h2').textContent=isAdmin?'Teilnehmer verwalten':'Ligaübersicht';
   $('clan-player').replaceChildren(new Option('Spieler manuell eingeben',''),...result.members.sort((a,b)=>a.name.localeCompare(b.name,'de')).map(p=>new Option(`${p.name} (${p.tag})`,JSON.stringify(p))));
   render();$('league-status').textContent='Teilnehmerlisten geladen.';
  }catch(e){$('league-status').textContent=`Teilnehmer konnten nicht geladen werden. ${e.message}`;}finally{toggleBusy(false);}
 }
 async function mutate(input){
- if(busy||!state)return;toggleBusy(true);$('league-status').textContent='Wird gespeichert …';
- try{const response=await fetch('/api/leagues',{method:'POST',headers:{'Content-Type':'application/json','X-War-Imperium':'local'},body:JSON.stringify({...input,revision:state.revision})});const result=await response.json();if(!response.ok)throw Error(result.error||'Speichern fehlgeschlagen');state=result.state;isAdmin=result.role==='admin';currentRole=result.role;
-  document.getElementById('participant-form').hidden=!isAdmin;document.querySelector('.league-menu h2').textContent=isAdmin?'Teilnehmer verwalten':'Ligaübersicht';document.querySelectorAll('header a[href="/"]').forEach(a=>a.hidden=currentRole==='player');render();
+ if(busy||!state||!canEnterResults)return;toggleBusy(true);$('league-status').textContent='Wird gespeichert …';
+ try{const response=await fetch('/api/leagues',{method:'POST',headers:{'Content-Type':'application/json','X-War-Imperium':'local'},body:JSON.stringify({...input,revision:state.revision})});const result=await response.json();if(!response.ok)throw Error(result.error||'Speichern fehlgeschlagen');state=result.state;isAdmin=result.role==='admin';currentRole=result.role;canEnterResults=currentRole==='admin'||currentRole==='player';
+  document.getElementById('participant-form').hidden=!isAdmin;document.querySelector('.league-menu h2').textContent=isAdmin?'Teilnehmer verwalten':'Ligaübersicht';render();
   if(input.action==='add'){$('player-name').value='';$('player-tag').value='';$('clan-player').value='';}
   const messages={add:'Teilnehmer hinzugefügt, Spielplan aktualisiert und gespeichert.',remove:'Teilnehmer entfernt, Tabelle und Spielplan aktualisiert.',result:'Ergebnis gespeichert. Tabelle aktualisiert.',clearResult:'Ergebnis zurückgesetzt. Tabelle aktualisiert.'};
   $('league-status').textContent=messages[input.action];return true;
@@ -129,4 +130,4 @@ async function mutate(input){
 }
 $('participant-form').onsubmit=event=>{event.preventDefault();mutate({action:'add',leagueId:Number($('league').value),name:$('player-name').value,tag:$('player-tag').value});};
 $('clan-player').onchange=()=>{if($('clan-player').value){const p=JSON.parse($('clan-player').value);$('player-name').value=p.name;$('player-tag').value=p.tag;}};
-$('reload-leagues').onclick=load;load();
+$('reload-leagues').onclick=load;document.addEventListener('wi-auth-change',load);load();

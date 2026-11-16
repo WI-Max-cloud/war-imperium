@@ -20,5 +20,6 @@ export async function clanPlacements(api) {
    results.push({title,rank:found?.rank??null,previousRank:found?.previousRank??null,score:found?.clanScore??null,checked:count,complete});
   }catch(e){results.push({title,error:e.message?.startsWith('API')?e.message:'Rangliste momentan nicht abrufbar.'});}
  }
- return {updatedAt:new Date().toISOString(),location:location?.name??null,results};
+ const updatedAt=new Date().toISOString();
+ return {updatedAt,location:location?.name??null,results,publicClan:{name:clan.name||'War Imperium',warTrophies:Number.isFinite(clan.clanWarTrophies)?clan.clanWarTrophies:null,members:Number.isInteger(clan.members)?clan.members:null,updatedAt}};
 }
