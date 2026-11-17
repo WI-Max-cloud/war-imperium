@@ -77,8 +77,7 @@ function printClanReport(){
  if(appRole!=='admin')return;
  if(!demo&&(attendanceTable.querySelector('input:disabled'))){$('status').textContent='Bitte warten, bis alle Änderungen gespeichert sind.';return;}
  clanPrintReport.replaceChildren();
- const title=document.createElement('h2');title.textContent='War Imperium · Clanbericht';
- const summary=document.createElement('p');summary.textContent=exportMetadata().join(' · ');clanPrintReport.append(title,summary);
+
  const panels=[document.querySelector('.player-points-panel'),chartPanel,attendancePanel,placementPanel];
  for(const [index,panel] of panels.entries()){
   const copy=panel.cloneNode(true);copy.className='clan-print-section';
@@ -88,7 +87,17 @@ function printClanReport(){
   copy.querySelectorAll('details').forEach(details=>details.open=true);
   if(index===0){const heading=document.createElement('h2');heading.textContent='Spielerpunkte';copy.prepend(heading);}
   if(index===2){copy.querySelector('h2').textContent+=` · Woche ${attendanceSelect.selectedOptions[0]?.textContent??'nicht verfügbar'}`;copy.querySelectorAll(':scope > label').forEach(el=>el.remove());copy.querySelectorAll('.absence-check').forEach(label=>{const checked=label.querySelector('input')?.checked;label.textContent=checked?'Abgemeldet':'Nicht abgemeldet';});}
-  copy.querySelectorAll('input,select,summary').forEach(el=>el.remove());clanPrintReport.append(copy);
+  copy.querySelectorAll('input,select,summary').forEach(el=>el.remove());
+  const masthead=document.createElement('div');masthead.className='report-masthead';
+  const crest=document.createElement('img');crest.src='/crest.svg';crest.alt='';crest.width=42;crest.height=52;
+  const brand=document.createElement('div'),kicker=document.createElement('p');kicker.className='report-kicker';kicker.textContent='WAR IMPERIUM · CLAN #22QJG0';
+  const reportTitle=document.createElement('strong');reportTitle.textContent='Clankrieg Report';brand.append(kicker,reportTitle);
+  const sectionNumber=document.createElement('span');sectionNumber.className='report-number';sectionNumber.textContent=String(index+1).padStart(2,'0');masthead.append(crest,brand,sectionNumber);copy.prepend(masthead);
+  const meta=document.createElement('div');meta.className='report-metadata';
+  const entries=[['Kriegswoche',$('week').selectedOptions[0]?.textContent??'—'],['Auswertung',$('window').selectedOptions[0]?.textContent??'—'],['Spielerfilter',memberToggle.checked?'Aktuell im Clan':'Alle Teilnehmer'],['Erstellt',new Date().toLocaleString('de-DE')]];
+  for(const [label,value] of entries){const entry=document.createElement('div'),caption=document.createElement('span'),text=document.createElement('strong');caption.textContent=label;text.textContent=value;entry.append(caption,text);meta.append(entry);}masthead.after(meta);
+  if(index===0){const legend=document.createElement('p');legend.className='report-score-legend';legend.textContent='Punktebewertung: bis 2.500 rot · ab 2.900 grün · auf 16 Angriffe normalisiert';meta.after(legend);}
+  const footer=document.createElement('p');footer.className='report-section-footer';footer.textContent='WAR IMPERIUM  /  '+['Spielerpunkte','Clanpunkte','Fehlende Angriffe','Clanplatzierungen'][index]+'  ·  '+String(index+1).padStart(2,'0')+' / 04';copy.append(footer);clanPrintReport.append(copy);
  }
  const originalTitle=document.title;document.title='War Imperium Clanbericht';document.body.classList.add('print-clan-report');
  const restore=()=>{document.body.classList.remove('print-clan-report');document.title=originalTitle;clanPrintReport.replaceChildren();};window.addEventListener('afterprint',restore,{once:true});

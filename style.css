@@ -93,3 +93,38 @@ input[type=checkbox]{accent-color:#ed3047}th{color:#8fd9f1;text-transform:upperc
 }
 @media print{.game-header .game-brand img,.game-header nav,.game-brand small{display:none!important}.game-header .game-brand{color:black;text-decoration:none}.game-header .game-brand strong{font-size:14pt}}
 
+
+/* Clan report: light editorial layout, independent of screen theme. */
+@media print{
+ @page{size:A4 portrait;margin:13mm 12mm 15mm}
+ body.print-clan-report #clan-print-report{font-family:Arial,Helvetica,sans-serif;font-size:9pt;line-height:1.45;color:#142338;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+ #clan-print-report .clan-print-section{position:relative;padding:0!important;background:white!important}
+ #clan-print-report .report-masthead{display:flex;align-items:center;gap:4mm;border-top:2mm solid #cf263e;border-bottom:.4mm solid #cbd5df;padding:5mm 0 4mm;margin:0 0 4mm;break-inside:avoid}
+ #clan-print-report .report-masthead img{display:block;width:11mm;height:14mm}
+ #clan-print-report .report-masthead>div{flex:1}
+ #clan-print-report .report-kicker{font-size:8pt;letter-spacing:1.5px;font-weight:bold;color:#52647a;margin:0 0 1mm}
+ #clan-print-report .report-masthead strong{font-size:23pt;line-height:1.1;color:#101f34;letter-spacing:-.7px}
+ #clan-print-report .report-number{font-size:32pt;color:#cf263e;font-weight:bold;line-height:1}
+ #clan-print-report .report-metadata{display:grid;grid-template-columns:1fr 1fr;gap:3mm 5mm;background:#eef3f7;border-left:1mm solid #297fa3;padding:3mm 4mm;margin:0 0 5mm;break-inside:avoid}
+ #clan-print-report .report-metadata span{display:block;text-transform:uppercase;font-size:6.8pt;letter-spacing:.6px;color:#607087}
+ #clan-print-report .report-metadata strong{display:block;font-size:8.5pt;color:#142338;font-weight:bold}
+ #clan-print-report .clan-print-section>h2{font-size:16pt;color:#142338;margin:5mm 0 3mm;padding-bottom:2mm;border-bottom:.5mm solid #cf263e;font-style:normal}
+ #clan-print-report .report-score-legend{font-size:7.5pt;color:#52647a;margin:0 0 4mm}
+ #clan-print-report table{font-size:8.5pt;border-collapse:collapse;margin-top:3mm;width:100%;table-layout:fixed}
+ #clan-print-report thead{display:table-header-group}
+ #clan-print-report th{background:#e4ebf2;color:#142338!important;font-size:7pt;letter-spacing:.3px;text-transform:uppercase;padding:3mm 2.5mm;border-bottom:.5mm solid #297fa3}
+ #clan-print-report td{padding:2.8mm 2.5mm;color:#24364d;border-bottom:.2mm solid #d7e0e8;font-size:8.5pt;line-height:1.35}
+ #clan-print-report tbody tr:nth-child(even){background:#f2f6f9}
+ #clan-print-report tr{break-inside:avoid}#clan-print-report td:nth-child(3){font-variant-numeric:tabular-nums}
+ #clan-print-report td.score-low{color:#b91c1c!important;font-weight:bold;background:#fff0f0}
+ #clan-print-report td.score-high{color:#137345!important;font-weight:bold;background:#eaf8ef}
+ #clan-print-report .placement-grid{gap:4mm;margin-top:5mm}
+ #clan-print-report .placement-grid article{border:.3mm solid #ccd8e2;border-top:1mm solid #297fa3;border-radius:0;padding:5mm;background:#f5f8fb!important}
+ #clan-print-report .placement-grid h3{font-size:9pt;color:#52647a!important;margin:0 0 3mm}
+ #clan-print-report .placement-grid strong{font-size:21pt;color:#142338!important}
+ #clan-print-report .placement-grid .best-placement{color:#52647a!important;font-size:8pt;border-top:.2mm solid #cbd5df;margin-top:4mm;padding-top:3mm}
+ #clan-print-report .chart-record{font-weight:bold;color:#142338;border-left:1mm solid #cf263e;padding:2mm 3mm;background:#eef3f7}
+ #clan-print-report .chart-axis{fill:#52647a;font-size:12px}#clan-print-report .chart-value{fill:#142338;font-size:13px}
+ #clan-print-report .trend-scroll polyline{stroke:#237da5;stroke-width:3}#clan-print-report .trend-scroll circle{fill:#cf263e}
+ #clan-print-report .report-section-footer{border-top:.3mm solid #cbd5df;padding-top:3mm;margin:6mm 0 0;text-align:right;color:#65768b;font-size:7pt;letter-spacing:.6px;break-inside:avoid}
+}
