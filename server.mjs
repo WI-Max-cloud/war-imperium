@@ -1,3 +1,4 @@
+import {familyStats} from './family-stats.mjs';
 import {contentHandler} from './content-store.mjs';
 import http from 'node:http';
 import {readFile,writeFile,mkdir,rename} from 'node:fs/promises';
@@ -16,6 +17,7 @@ const root=new URL('./',import.meta.url), data=new URL('./data/',root);
 const storage=createStorage({directory:data});
 if(process.env.RENDER==='true'&&(!process.env.APP_PASSWORD||process.env.APP_PASSWORD.length<16))throw Error('Für Render ein APP_PASSWORD mit mindestens 16 Zeichen setzen.');
 const handleContent=contentHandler(storage);
+const getFamilyStats=familyStats(storage,api,()=>!!process.env.CLASH_API_KEY);
 let busy=false;
 let attendanceBusy=false;
 let leaguesBusy=false;
@@ -70,6 +72,7 @@ export const server=http.createServer(async(req,res)=>{
   const members=await roster(),profiles=await storage.read('member-profiles',{});
   return send(200,{role,roster:members,profiles:Object.fromEntries((members?.members??[]).map(m=>[m.tag,{joinedOn:profiles[m.tag]?.joinedOn??''}])),placements:await storage.read('clan-placements',{updatedAt:null,results:[]})});
  }
+ if(req.method==='GET'&&req.url==='/api/family-stats')return send(200,await getFamilyStats());
  if(req.method==='GET'&&req.url==='/api/public-clan'){
 
   const summary=(await storage.read('clan-placements',null))?.publicClan;
