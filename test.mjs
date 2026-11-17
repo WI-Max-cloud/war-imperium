@@ -240,3 +240,11 @@ test('Vize verwendet eine eigene signierte Sitzung und darf Ergebnisse bearbeite
  assert.equal(sessionRole(cookie,{...env,VICE_PASSWORD:'rotated'},now),null);
  assert.equal(sessionRole(cookie,{...env,VICE_PASSWORD:''},now),null);
 });
+
+test('Vize darf Clankrieg lesen und Abmeldungen speichern, aber keine Verwaltung',async()=>{
+ const {viceRouteAllowed}=await import('./access.mjs');
+ for(const path of ['/clankrieg','/clankrieg/','/app.mjs','/core.mjs','/export.mjs','/api/history','/api/placements'])assert.equal(viceRouteAllowed('GET',path),true);
+ assert.equal(viceRouteAllowed('POST','/api/absence'),true);
+ for(const path of ['/api/sync','/api/member-profile','/api/placements','/api/content','/api/player-rankings'])assert.equal(viceRouteAllowed('POST',path),false);
+ assert.equal(viceRouteAllowed('GET','/.env'),false);
+});

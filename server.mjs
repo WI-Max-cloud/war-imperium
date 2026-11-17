@@ -5,7 +5,7 @@ import {fileURLToPath} from 'node:url';
 import {parseLog,demo} from './core.mjs';
 import {clanPlacements} from './rankings.mjs';
 import {createStorage} from './storage.mjs';
-import {accessRole,canScore,publicRoute,sameOrigin} from './access.mjs';
+import {accessRole,canScore,publicRoute,viceRouteAllowed,sameOrigin} from './access.mjs';
 import {issueSession,sessionRole,sessionCookie} from './sessions.mjs';
 import {emptyLeagues,updateLeagues} from './leagues.mjs';
 import {prepareLeagues} from './league-core.mjs';
@@ -57,7 +57,7 @@ export const server=http.createServer(async(req,res)=>{
  if(req.method==='GET'&&req.url==='/api/session')return send(200,{role,canScore:canScore(role),playerUser:process.env.PLAYER_USER||'Spieler',adminUser:process.env.APP_USER||'admin'});
  const tournamentWrite=req.method==='POST'&&['/api/leagues','/api/finals'].includes(req.url);
  if(tournamentWrite&&!canScore(role))return send(403,{error:'Bitte zuerst über „Ergebnisse eintragen“ als Spieler anmelden.'});
- if(!publicRoute(req.method,req.url)&&!tournamentWrite&&role!=='admin'){
+ if(!publicRoute(req.method,req.url)&&!tournamentWrite&&role!=='admin'&&!(role==='vice'&&viceRouteAllowed(req.method,req.url))){
   if(req.url.startsWith('/api/'))return send(403,{error:'Dieser Bereich ist ausschließlich für den Admin freigeschaltet.'});
   if(!['/clankrieg','/clankrieg/'].includes(req.url))return send(404,{error:'Nicht gefunden'});
   res.writeHead(302,{'Location':'/#admin-login','Cache-Control':'no-store'});res.end();return;
