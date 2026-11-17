@@ -7,6 +7,45 @@ function selectLeague(id,focus=false){selectedLeague=id;for(const tab of tabs.ch
 tabs.onkeydown=event=>{const ids=[...tabs.children].map(b=>Number(b.dataset.league)),index=ids.indexOf(selectedLeague);let next;if(event.key==='ArrowRight')next=ids[(index+1)%ids.length];if(event.key==='ArrowLeft')next=ids[(index+ids.length-1)%ids.length];if(event.key==='Home')next=ids[0];if(event.key==='End')next=ids.at(-1);if(next){event.preventDefault();selectLeague(next,true);}};
 const openRounds=new Set();
 const openOnlyLeagues=new Set();
+let jpgExportBusy=false;
+function jpgPages(league,createdAt){
+ const names=new Map(league.players.map(p=>[p.id,p.name]));
+ const matches=(league.matches??[]).filter(m=>m.homeScore==null||m.awayScore==null).sort((a,b)=>a.round-b.round);
+ const pages=[];for(let i=0;i<matches.length;i+=10)pages.push(matches.slice(i,i+10));
+ return pages.map((page,index)=>()=>{
+  const canvas=document.createElement('canvas');canvas.width=1200;canvas.height=420+page.length*146;const ctx=canvas.getContext('2d');
+  const bg=ctx.createLinearGradient(0,0,1200,canvas.height);bg.addColorStop(0,'#03172d');bg.addColorStop(1,'#020912');ctx.fillStyle=bg;ctx.fillRect(0,0,1200,canvas.height);
+  ctx.fillStyle='#f52d4a';ctx.fillRect(48,42,1104,6);ctx.fillStyle='#74ddff';ctx.fillRect(48,canvas.height-46,1104,2);
+  ctx.fillStyle='#94c4df';ctx.font='bold 18px Arial';ctx.fillText('WAR IMPERIUM  /  LIGA & FINALS',60,95);
+  ctx.fillStyle='#fff';ctx.font='italic bold 62px Arial';ctx.fillText('OFFENE SPIELE',58,170);ctx.fillStyle='#ff425d';ctx.font='bold 36px Arial';ctx.fillText(league.name,60,225);
+  ctx.fillStyle='#bdd0e4';ctx.font='22px Arial';ctx.fillText(`${matches.length} offene Begegnungen  ·  Jeder gegen jeden`,60,272);
+  ctx.strokeStyle='#2b526e';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(60,300);ctx.lineTo(1140,300);ctx.stroke();
+  function player(text,x,y){let lines,size;for(size=26;size>=14;size--){ctx.font=`bold ${size}px Arial`;lines=[''];for(const word of (text??'Unbekannter Spieler').split(/\s+/)){let last=lines.length-1;const combined=lines[last]?lines[last]+' '+word:word;if(ctx.measureText(combined).width<=430)lines[last]=combined;else if(ctx.measureText(word).width<=430)lines.push(word);else{if(lines[last])lines.push('');for(const char of Array.from(word)){last=lines.length-1;if(ctx.measureText(lines[last]+char).width>430)lines.push(char);else lines[last]+=char;}}}if(lines.length<=3)break;}ctx.fillStyle='#f3f7fc';lines.forEach((line,n)=>ctx.fillText(line,x,y+n*(size+5)));}
+  page.forEach((match,i)=>{const top=326+i*146;ctx.fillStyle=i%2?'#0b2238':'#071b30';ctx.fillRect(60,top,1080,132);ctx.fillStyle='#f3314c';ctx.fillRect(60,top,4,132);ctx.strokeStyle='#21465e';ctx.strokeRect(60,top,1080,132);
+   ctx.fillStyle='#82d8f3';ctx.font='bold 16px Arial';ctx.fillText(`SPIELTAG ${match.round}`,84,top+28);ctx.fillStyle='#91a8bd';ctx.font='16px Arial';ctx.fillText('NOCH OFFEN',1000,top+28);
+   player(names.get(match.home),84,top+64);player(names.get(match.away),668,top+64);
+   ctx.fillStyle='#fa3b55';ctx.font='italic bold 25px Arial';ctx.fillText('VS',581,top+82);
+  });
+  ctx.fillStyle='#a1b7cc';ctx.font='17px Arial';ctx.fillText('Stand: '+createdAt.toLocaleString('de-DE'),60,canvas.height-79);ctx.textAlign='right';ctx.fillText(`SEITE ${index+1} / ${pages.length}`,1140,canvas.height-79);ctx.textAlign='left';
+  return canvas;
+ });
+}
+async function exportOpenMatchesJpg(leagueId,trigger){
+ if(currentRole!=='admin'||busy||jpgExportBusy)return;jpgExportBusy=true;trigger.disabled=true;const urls=[];
+ try{
+  const response=await fetch('/api/leagues');const result=await response.json();if(!response.ok)throw Error(result.error||'Abruf fehlgeschlagen');if(result.role!=='admin')throw Error('Bitte als Admin anmelden.');
+  const league=result.state.leagues.find(l=>l.id===leagueId);if(!league)throw Error('Liga nicht gefunden');const createdAt=new Date(),pages=jpgPages(league,createdAt);
+  if(!pages.length){$('league-status').textContent='Keine offenen Spiele in dieser Liga.';return;}
+  const dialog=document.createElement('dialog');dialog.className='jpg-export-dialog';dialog.setAttribute('aria-label','Offene Spiele als JPG speichern');
+  const title=document.createElement('h2');title.textContent=league.name+' · Offene Spiele';const note=document.createElement('p');note.textContent=pages.length===1?'Speichere das Bild über den Button unter der Vorschau.':`${pages.length} Bilder mit jeweils höchstens 10 Spielen. Speichere die gewünschten Seiten einzeln.`;const close=document.createElement('button');close.type='button';close.textContent='Schließen';close.onclick=()=>dialog.close();dialog.append(title,note,close);
+  for(const [index,draw] of pages.entries()){const canvas=draw();
+   const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.94));if(!blob)throw Error('Bild konnte nicht erstellt werden');const url=URL.createObjectURL(blob);urls.push(url);
+   const figure=document.createElement('figure'),img=document.createElement('img');img.loading='lazy';img.src=url;img.alt=`Offene Spiele · ${league.name} · Seite ${index+1}`;img.width=canvas.width;img.height=canvas.height;canvas.width=canvas.height=1;
+   const link=document.createElement('a');link.href=url;link.download=`War-Imperium-Liga-${league.id}-offene-Spiele-${createdAt.toISOString().slice(0,10)}-${index+1}.jpg`;link.className='jpg-download';link.textContent=pages.length===1?'JPG-Bild speichern':`JPG-Bild ${index+1} speichern`;figure.append(img,link);dialog.append(figure);
+  }
+  dialog.addEventListener('close',()=>{urls.forEach(url=>URL.revokeObjectURL(url));dialog.remove();},{once:true});document.body.append(dialog);dialog.showModal();close.focus();$('league-status').textContent='JPG-Export erstellt. Er enthält den aktuell gespeicherten Stand.';
+ }catch(error){urls.forEach(url=>URL.revokeObjectURL(url));$('league-status').textContent=error.message;}finally{jpgExportBusy=false;trigger.disabled=false;}
+}
 const pdfRanges=new Map();
 const pdfReport=document.createElement('div');pdfReport.id='matchday-report';document.body.append(pdfReport);
 function printMatchdays(league,from,to){
@@ -58,7 +97,9 @@ function renderSchedule(league,section){
  const openOnly=openOnlyLeagues.has(league.id),openCount=matches.filter(isOpen).length;
  const filter=document.createElement('button');filter.type='button';filter.className='open-matches-toggle';filter.setAttribute('aria-pressed',String(openOnly));
  filter.textContent=openOnly?'Alle Spiele anzeigen':`Offene Spiele anzeigen (${openCount})`;
- filter.onclick=()=>{if(busy)return;if(openOnly)openOnlyLeagues.delete(league.id);else openOnlyLeagues.add(league.id);render();document.querySelector(`#league-panel-${league.id} .open-matches-toggle`)?.focus();};section.append(filter);
+ filter.onclick=()=>{if(busy)return;if(openOnly)openOnlyLeagues.delete(league.id);else openOnlyLeagues.add(league.id);render();document.querySelector(`#league-panel-${league.id} .open-matches-toggle`)?.focus();};
+ const scheduleActions=document.createElement('div');scheduleActions.className='schedule-actions';scheduleActions.append(filter);section.append(scheduleActions);
+ if(isAdmin){const jpg=document.createElement('button');jpg.type='button';jpg.className='open-matches-jpg';jpg.textContent='Offene Spiele als JPG';jpg.disabled=openCount===0;jpg.onclick=()=>exportOpenMatchesJpg(league.id,jpg);scheduleActions.append(jpg);}
  note.textContent=matches.length?`${matches.filter(m=>m.homeScore!==null).length} / ${matches.length} Spiele abgeschlossen · Jede Paarung genau einmal.`:'Ab zwei Teilnehmern wird der Spielplan automatisch erstellt.';section.append(note);
  if(currentRole==='admin')section.append(matchdayExport(league));
  if(openOnly&&openCount===0){const empty=document.createElement('p');empty.className='schedule-note';empty.setAttribute('role','status');empty.textContent=matches.length?'Alle Spiele dieser Liga sind abgeschlossen.':'Für diese Liga gibt es noch keine Spiele.';section.append(empty);return;}
