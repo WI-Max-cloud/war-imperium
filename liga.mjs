@@ -6,6 +6,7 @@ const tabs=document.createElement('div');tabs.className='league-tabs';tabs.setAt
 function selectLeague(id,focus=false){selectedLeague=id;for(const tab of tabs.children){const active=Number(tab.dataset.league)===id;tab.setAttribute('aria-selected',String(active));tab.tabIndex=active?0:-1;if(active&&focus)tab.focus();}document.querySelectorAll('[data-league-panel]').forEach(panel=>panel.hidden=Number(panel.dataset.leaguePanel)!==id);}
 tabs.onkeydown=event=>{const ids=[...tabs.children].map(b=>Number(b.dataset.league)),index=ids.indexOf(selectedLeague);let next;if(event.key==='ArrowRight')next=ids[(index+1)%ids.length];if(event.key==='ArrowLeft')next=ids[(index+ids.length-1)%ids.length];if(event.key==='Home')next=ids[0];if(event.key==='End')next=ids.at(-1);if(next){event.preventDefault();selectLeague(next,true);}};
 const openRounds=new Set();
+const openOnlyLeagues=new Set();
 const pdfRanges=new Map();
 const pdfReport=document.createElement('div');pdfReport.id='matchday-report';document.body.append(pdfReport);
 function printMatchdays(league,from,to){
@@ -53,14 +54,21 @@ function toggleBusy(value){busy=value;$('add-player').disabled=value||!state||!i
 function renderSchedule(league,section){
  const title=document.createElement('h3');title.textContent='Spielplan · Jeder gegen jeden';section.append(title);
  const matches=league.matches??[],note=document.createElement('p');note.className='schedule-note';
+ const isOpen=match=>match.homeScore==null||match.awayScore==null;
+ const openOnly=openOnlyLeagues.has(league.id),openCount=matches.filter(isOpen).length;
+ const filter=document.createElement('button');filter.type='button';filter.className='open-matches-toggle';filter.setAttribute('aria-pressed',String(openOnly));
+ filter.textContent=openOnly?'Alle Spiele anzeigen':`Offene Spiele anzeigen (${openCount})`;
+ filter.onclick=()=>{if(busy)return;if(openOnly)openOnlyLeagues.delete(league.id);else openOnlyLeagues.add(league.id);render();document.querySelector(`#league-panel-${league.id} .open-matches-toggle`)?.focus();};section.append(filter);
  note.textContent=matches.length?`${matches.filter(m=>m.homeScore!==null).length} / ${matches.length} Spiele abgeschlossen · Jede Paarung genau einmal.`:'Ab zwei Teilnehmern wird der Spielplan automatisch erstellt.';section.append(note);
  if(currentRole==='admin')section.append(matchdayExport(league));
+ if(openOnly&&openCount===0){const empty=document.createElement('p');empty.className='schedule-note';empty.setAttribute('role','status');empty.textContent=matches.length?'Alle Spiele dieser Liga sind abgeschlossen.':'Für diese Liga gibt es noch keine Spiele.';section.append(empty);return;}
  const names=new Map(league.players.map(p=>[p.id,p.name]));
  for(const round of [...new Set(matches.map(m=>m.round))]){
-  const roundMatches=matches.filter(m=>m.round===round),details=document.createElement('details'),summary=document.createElement('summary'),key=`${league.id}-${round}`;
-  details.className='match-round';details.open=openRounds.has(key)||round===1;
+  const allRoundMatches=matches.filter(m=>m.round===round),roundMatches=openOnly?allRoundMatches.filter(isOpen):allRoundMatches,details=document.createElement('details'),summary=document.createElement('summary'),key=`${league.id}-${round}`;
+  if(openOnly&&!roundMatches.length)continue;
+  details.className='match-round';details.open=openOnly||openRounds.has(key)||round===1;
   details.ontoggle=()=>{if(details.open)openRounds.add(key);else openRounds.delete(key);};
-  summary.textContent=`Spieltag ${round} · ${roundMatches.filter(m=>m.homeScore!==null).length} / ${roundMatches.length} abgeschlossen`;
+  summary.textContent=openOnly?`Spieltag ${round} · ${roundMatches.length} offene Spiele`:`Spieltag ${round} · ${roundMatches.filter(m=>m.homeScore!==null).length} / ${roundMatches.length} abgeschlossen`;
   details.append(summary);
   for(const match of roundMatches){
    if(!canEnterResults){const result=document.createElement('p');result.className='public-match-result';result.textContent=`${names.get(match.home)} — ${names.get(match.away)} · ${match.homeScore===null?'Noch offen':match.homeScore+':'+match.awayScore}`;details.append(result);continue;}
@@ -84,7 +92,7 @@ function renderSchedule(league,section){
    };
    details.append(form);
   }
-  if(league.players.length%2===1){const active=new Set(roundMatches.flatMap(m=>[m.home,m.away])),idle=league.players.find(p=>!active.has(p.id));if(idle){const free=document.createElement('p');free.className='schedule-note';free.textContent=`Spielfrei: ${idle.name}`;details.append(free);}}
+  if(!openOnly&&league.players.length%2===1){const active=new Set(roundMatches.flatMap(m=>[m.home,m.away])),idle=league.players.find(p=>!active.has(p.id));if(idle){const free=document.createElement('p');free.className='schedule-note';free.textContent=`Spielfrei: ${idle.name}`;details.append(free);}}
   section.append(details);
  }
 }
