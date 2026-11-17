@@ -19,7 +19,7 @@ test('Öffentliche Ansichten sind lesbar; die neue Rechteverteilung erlaubt nur 
  assert.equal(accessRole('Basic '+Buffer.from('Vize:vice-test').toString('base64'),env),'vice');
  for(const path of ['/','/liga','/finals','/home.css','/site-auth.mjs','/api/leagues','/api/finals'])assert.equal(publicRoute('GET',path),true);
  for(const path of ['/clankrieg','/api/history','/api/member-profile','/api/player-rankings'])assert.equal(publicRoute('GET',path),false);
- assert.equal(publicRoute('POST','/api/leagues'),false);assert.equal(canScore('vice'),false);assert.equal(canScore('guest'),false);assert.equal(canScore('player'),true);assert.equal(canScore('admin'),true);
+ assert.equal(publicRoute('POST','/api/leagues'),false);assert.equal(canScore('vice'),true);assert.equal(canScore('guest'),false);assert.equal(canScore('player'),true);assert.equal(canScore('admin'),true);
 });
 test('Spielersitzungen sind signiert, zeitlich begrenzt und nach Passwortänderung ungültig',()=>{
  const env={APP_PASSWORD:'admin-test-secret',PLAYER_USER:'Spieler',PLAYER_PASSWORD:'player-test'};
@@ -232,4 +232,11 @@ test('Admin-Sitzung erhält nur signierte Rechte und verfällt bei Passwortwechs
  const [payload,mac]=issueSession('player',{...env,PLAYER_PASSWORD:'test'},now).split('.');
  const forged=Buffer.from(JSON.stringify({...JSON.parse(Buffer.from(payload,'base64url')),role:'admin',user:'admin'})).toString('base64url');
  assert.equal(sessionRole('wi_player='+forged+'.'+mac,env,now),null);
+});
+
+test('Vize verwendet eine eigene signierte Sitzung und darf Ergebnisse bearbeiten',()=>{
+ const env={APP_PASSWORD:'admin-test',VICE_USER:'Vize',VICE_PASSWORD:'vice-test'},now=Date.now();
+ const cookie=sessionCookie(issueSession('vice',env,now));assert.equal(sessionRole(cookie,env,now),'vice');assert.equal(canScore('vice'),true);
+ assert.equal(sessionRole(cookie,{...env,VICE_PASSWORD:'rotated'},now),null);
+ assert.equal(sessionRole(cookie,{...env,VICE_PASSWORD:''},now),null);
 });

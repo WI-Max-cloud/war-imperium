@@ -1,6 +1,10 @@
 import {leagueStandings,leagueZones} from './league-core.mjs';
 const $=id=>document.getElementById(id);
 let state=null,busy=false,isAdmin=false,currentRole=null,canEnterResults=false;
+let selectedLeague=1;const tableOpen=new Map();
+const tabs=document.createElement('div');tabs.className='league-tabs';tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Liga auswählen');document.getElementById('league-tables').before(tabs);
+function selectLeague(id,focus=false){selectedLeague=id;for(const tab of tabs.children){const active=Number(tab.dataset.league)===id;tab.setAttribute('aria-selected',String(active));tab.tabIndex=active?0:-1;if(active&&focus)tab.focus();}document.querySelectorAll('[data-league-panel]').forEach(panel=>panel.hidden=Number(panel.dataset.leaguePanel)!==id);}
+tabs.onkeydown=event=>{const ids=[...tabs.children].map(b=>Number(b.dataset.league)),index=ids.indexOf(selectedLeague);let next;if(event.key==='ArrowRight')next=ids[(index+1)%ids.length];if(event.key==='ArrowLeft')next=ids[(index+ids.length-1)%ids.length];if(event.key==='Home')next=ids[0];if(event.key==='End')next=ids.at(-1);if(next){event.preventDefault();selectLeague(next,true);}};
 const openRounds=new Set();
 const pdfRanges=new Map();
 const pdfReport=document.createElement('div');pdfReport.id='matchday-report';document.body.append(pdfReport);
@@ -45,7 +49,7 @@ function matchdayExport(league){
  from.disabled=to.disabled=button.disabled=rounds.length===0;
  button.onclick=()=>printMatchdays(state.leagues.find(l=>l.id===league.id),Number(from.value),Number(to.value));menu.append(button,note);return menu;
 }
-function toggleBusy(value){busy=value;$('add-player').disabled=value||!state||!isAdmin;$('reload-leagues').disabled=value;document.querySelectorAll('.remove-player,.match-reset').forEach(b=>b.disabled=value||!isAdmin);document.querySelectorAll('.match-save,.match-score').forEach(b=>b.disabled=value||!canEnterResults);}
+function toggleBusy(value){busy=value;$('add-player').disabled=value||!state||!isAdmin;document.querySelectorAll('.remove-player,.match-reset').forEach(b=>b.disabled=value||!isAdmin);document.querySelectorAll('.match-save,.match-score').forEach(b=>b.disabled=value||!canEnterResults);}
 function renderSchedule(league,section){
  const title=document.createElement('h3');title.textContent='Spielplan · Jeder gegen jeden';section.append(title);
  const matches=league.matches??[],note=document.createElement('p');note.className='schedule-note';
@@ -85,16 +89,17 @@ function renderSchedule(league,section){
  }
 }
 function render(){
- $('league-tables').replaceChildren();
+ $('league-tables').replaceChildren();tabs.replaceChildren();
  for(const league of state.leagues){
-  const section=document.createElement('section');section.className='panel league-table';
+  const section=document.createElement('section');section.className='panel league-table';section.dataset.leaguePanel=league.id;section.id='league-panel-'+league.id;section.setAttribute('role','tabpanel');section.setAttribute('aria-labelledby','league-tab-'+league.id);
+ const tab=document.createElement('button');tab.type='button';tab.textContent=league.name;tab.id='league-tab-'+league.id;tab.dataset.league=league.id;tab.setAttribute('role','tab');tab.setAttribute('aria-controls',section.id);tab.onclick=()=>selectLeague(league.id);tabs.append(tab);
   const heading=document.createElement('h2');heading.textContent=league.name;
   const count=document.createElement('small');count.textContent=`${league.players.length} Teilnehmer`;heading.append(count);section.append(heading);
   const finalsLink=document.createElement('a');finalsLink.href='/finals';finalsLink.className='finals-link';finalsLink.textContent='War Imperium Finals';section.append(finalsLink);
   const rules=document.createElement('p');rules.className='schedule-note';rules.textContent=league.id===1?'Finals: Plätze 1–4 · Abstieg: letzte 3 Plätze.':league.id===2?'Aufstieg: Plätze 1–3 · Finals: Platz 1 · Abstieg: letzte 3 Plätze.':'Aufstieg: Plätze 1–3 · Finals: Platz 1.';section.append(rules);
   const provisional=document.createElement('p');provisional.className='schedule-note';provisional.textContent='Markierungen zeigen die Plätze nach aktuellem Tabellenstand. Auf- und Abstieg werden nicht automatisch durchgeführt.';
   if(league.id===2&&league.players.length>0&&league.players.length<6)provisional.textContent+=' Bei weniger als 6 Teilnehmern überschneiden sich Aufstiegs- und Abstiegsplätze.';
-  section.append(provisional);
+  section.append(provisional);const standings=document.createElement('details');standings.className='league-standings';standings.open=tableOpen.get(league.id)??true;const standingsTitle=document.createElement('summary');standingsTitle.textContent='Platzierungen · '+league.name;standings.append(standingsTitle);standings.ontoggle=()=>tableOpen.set(league.id,standings.open);section.append(standings);
   if(!league.players.length){const empty=document.createElement('p');empty.className='league-empty';empty.textContent=isAdmin?'Noch keine Teilnehmer. Füge oben den ersten Spieler hinzu.':'Noch keine Teilnehmer für diese Liga eingetragen.';section.append(empty);}
   else{
    const scroll=document.createElement('div');scroll.className='table';const table=document.createElement('table'),thead=document.createElement('thead'),tr=document.createElement('tr');
@@ -106,14 +111,15 @@ function render(){
     if(!qualifications.childNodes.length)qualifications.textContent='—';row.append(qualifications);
     const td=document.createElement('td'),button=document.createElement('button');button.type='button';button.className='remove-player';button.textContent='Entfernen';button.setAttribute('aria-label',`${p.name} aus ${league.name} entfernen`);
     button.onclick=()=>{if(!busy&&confirm(`${p.name} aus ${league.name} entfernen? Alle Begegnungen und Ergebnisse dieses Spielers werden dabei gelöscht und die Tabelle neu berechnet.`))mutate({action:'remove',leagueId:league.id,playerId:p.id});};td.append(button);if(isAdmin)row.append(td);body.append(row);
-   });table.append(body);scroll.append(table);section.append(scroll);
+   });table.append(body);scroll.append(table);standings.append(scroll);
   }
   renderSchedule(league,section);$('league-tables').append(section);
  }
+ selectLeague(state.leagues.some(l=>l.id===selectedLeague)?selectedLeague:state.leagues[0]?.id);
 }
 async function load(){
  if(busy)return;toggleBusy(true);
- try{const response=await fetch('/api/leagues');const result=await response.json();if(!response.ok)throw Error(result.error||'Laden fehlgeschlagen');state=result.state;isAdmin=result.role==='admin';currentRole=result.role;canEnterResults=currentRole==='admin'||currentRole==='player';
+ try{const response=await fetch('/api/leagues');const result=await response.json();if(!response.ok)throw Error(result.error||'Laden fehlgeschlagen');state=result.state;isAdmin=result.role==='admin';currentRole=result.role;canEnterResults=['admin','player','vice'].includes(currentRole);
   document.getElementById('participant-form').hidden=!isAdmin;document.querySelector('.league-menu h2').textContent=isAdmin?'Teilnehmer verwalten':'Ligaübersicht';
   $('clan-player').replaceChildren(new Option('Spieler manuell eingeben',''),...result.members.sort((a,b)=>a.name.localeCompare(b.name,'de')).map(p=>new Option(`${p.name} (${p.tag})`,JSON.stringify(p))));
   render();$('league-status').textContent='Teilnehmerlisten geladen.';
@@ -121,7 +127,7 @@ async function load(){
 }
 async function mutate(input){
  if(busy||!state||!canEnterResults)return;toggleBusy(true);$('league-status').textContent='Wird gespeichert …';
- try{const response=await fetch('/api/leagues',{method:'POST',headers:{'Content-Type':'application/json','X-War-Imperium':'local'},body:JSON.stringify({...input,revision:state.revision})});const result=await response.json();if(!response.ok)throw Error(result.error||'Speichern fehlgeschlagen');state=result.state;isAdmin=result.role==='admin';currentRole=result.role;canEnterResults=currentRole==='admin'||currentRole==='player';
+ try{const response=await fetch('/api/leagues',{method:'POST',headers:{'Content-Type':'application/json','X-War-Imperium':'local'},body:JSON.stringify({...input,revision:state.revision})});const result=await response.json();if(!response.ok)throw Error(result.error||'Speichern fehlgeschlagen');state=result.state;isAdmin=result.role==='admin';currentRole=result.role;canEnterResults=['admin','player','vice'].includes(currentRole);
   document.getElementById('participant-form').hidden=!isAdmin;document.querySelector('.league-menu h2').textContent=isAdmin?'Teilnehmer verwalten':'Ligaübersicht';render();
   if(input.action==='add'){$('player-name').value='';$('player-tag').value='';$('clan-player').value='';}
   const messages={add:'Teilnehmer hinzugefügt, Spielplan aktualisiert und gespeichert.',remove:'Teilnehmer entfernt, Tabelle und Spielplan aktualisiert.',result:'Ergebnis gespeichert. Tabelle aktualisiert.',clearResult:'Ergebnis zurückgesetzt. Tabelle aktualisiert.'};
@@ -130,4 +136,4 @@ async function mutate(input){
 }
 $('participant-form').onsubmit=event=>{event.preventDefault();mutate({action:'add',leagueId:Number($('league').value),name:$('player-name').value,tag:$('player-tag').value});};
 $('clan-player').onchange=()=>{if($('clan-player').value){const p=JSON.parse($('clan-player').value);$('player-name').value=p.name;$('player-tag').value=p.tag;}};
-$('reload-leagues').onclick=load;document.addEventListener('wi-auth-change',load);load();
+document.addEventListener('wi-auth-change',load);load();
