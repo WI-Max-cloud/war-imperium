@@ -1,7 +1,7 @@
 import {tournamentUrl} from './tournament-context.mjs';
 import {resolveFinals,finalsDefinitions} from './finals-core.mjs';
 const $=id=>document.getElementById(id);let data=null,busy=false;
-const sourceLabel=source=>source.includes('-')?`Liga ${source[1]} · Platz ${source.split('-')[1]}`:`${source[0]==='W'?'Sieger':'Verlierer'} Spiel ${source.slice(1)}`;
+const sourceLabel=source=>source.includes('-')?`Liga ${source.slice(1).split('-')[0]} · Platz ${source.split('-')[1]}`:`${source[0]==='W'?'Sieger':'Verlierer'} Spiel ${source.slice(1)}`;
 function node(tag,className,text){const element=document.createElement(tag);if(className)element.className=className;if(text!==undefined)element.textContent=text;return element;}
 function setBusy(value){busy=value;document.querySelectorAll('#finals-bracket button,#finals-bracket .finals-score,#refresh-finals').forEach(b=>b.disabled=value);$('start-finals').disabled=value||data?.role!=='admin'||!!data?.state||!data?.preview?.ready;}
 async function load(){
@@ -29,7 +29,7 @@ function matchCard(match){
   const label=node('div');label.append(node('strong','',player?.name??sourceLabel(match[side+'Source'])),node('small','',sourceLabel(match[side+'Source'])));
   row.append(label,node('span','match-number',match[side+'Score']??'–'));card.append(row);
  }
- if(!match.active){card.append(node('p','schedule-note','Nur nötig, wenn der Lower-Bracket-Sieger Spiel 8 gewinnt.'));return card;}
+ if(!match.active){card.append(node('p','schedule-note','Nur nötig, wenn der Lower-Bracket-Sieger das Grand Final gewinnt.'));return card;}
  if(!match.ready){card.append(node('p','schedule-note','Wartet auf vorherige Ergebnisse.'));return card;}
  if(data.tournament?.archived||!['admin','player','vice'].includes(data.role)){card.append(node('p','read-only-note',data.tournament?.archived?'Archiviertes Turnier · nur Lesen.':'Zum Eintragen eines Ergebnisses oben anmelden.'));return card;}
  const form=node('form','finals-result'),left=node('label','',match.home.name),right=node('label','',match.away.name);
@@ -43,24 +43,26 @@ function matchCard(match){
 function render(){
  const state=data.state,view=resolveFinals(state);$('finals-slots').replaceChildren();
  $('seeds-title').textContent=state?'Festgelegte Finals-Teilnehmer':'Teilnehmer nach aktuellem Ligastand';
- $('seed-note').textContent=state?`Start: ${new Date(state.startedAt).toLocaleString('de-DE')}. Die Teilnehmer bleiben fest, auch wenn sich die Ligatabellen später ändern.`:'Vor dem Start die sechs Plätze prüfen. Bei vollständiger Gleichheit gilt die bisherige alphabetische Tabellenreihenfolge.';
+ $('seed-note').textContent=state?`Start: ${new Date(state.startedAt).toLocaleString('de-DE')}. Die Teilnehmer bleiben fest, auch wenn sich die Ligatabellen später ändern.`:'Vor dem Start die eingestellten Finals-Plätze prüfen. Bei vollständiger Gleichheit gilt die bisherige alphabetische Tabellenreihenfolge.';
  for(const seed of state?.seeds??data.preview.slots){const card=node('article','finals-slot');card.append(node('h3','',`Liga ${seed.leagueId} · Platz ${seed.rank}`),node('strong','',seed.player?.name??'Noch nicht besetzt'),node('p','',seed.leagueId===1?'Upper Bracket · 0 Niederlagen zum Start':'Lower Bracket · 1 Niederlage angerechnet'));$('finals-slots').append(card);}
  $('start-finals').hidden=!!state||data.role!=='admin'||data.tournament?.archived;$('finals-bracket').replaceChildren();
- const matches=state?view.matches:finalsDefinitions.map(m=>({...m,home:null,away:null,homeSource:m.home,awaySource:m.away,active:m.id!==9,ready:false,homeScore:null,awayScore:null}));
+ const definitions=state?.definitions??data.preview.definitions??finalsDefinitions;const resetId=state?.resetMatchId??data.preview.resetMatchId??9;const matches=state?view.matches:definitions.map(m=>({...m,home:null,away:null,homeSource:m.home,awaySource:m.away,active:m.id!==resetId,ready:false,homeScore:null,awayScore:null}));
  const graphSection=node('section','panel finals-graph-section');graphSection.append(node('h2','','War Imperium Finals · Turnierbaum'));
- const legend=node('p','bracket-legend');legend.textContent='Blaue Linie: Sieger weiter · Rote gestrichelte Linie: Verlierer ins Lower Bracket · Spiel 9 nur bei erforderlichem Reset';graphSection.append(legend);
+ const legend=node('p','bracket-legend');legend.textContent='Blaue Linie: Sieger weiter · Rote gestrichelte Linie: Verlierer ins Lower Bracket · Reset-Finale nur bei Bedarf';graphSection.append(legend);
  const graph=node('div','finals-graph');graph.setAttribute('aria-label','Double-Elimination-Turnierbaum');
- for(const id of [1,2,6,3,4,5,7,8,9]){const card=matchCard(matches.find(m=>m.id===id));card.dataset.match=id;graph.append(card);}
- graphSection.append(graph);$('finals-bracket').append(graphSection);observeGraph(graph);
+ const classic=definitions.length===9&&definitions[0]?.title==='Upper Semis';const order=classic?[1,2,6,3,4,5,7,8,9]:definitions.map(m=>m.id);if(!classic)graph.classList.add('dynamic-graph');
+ const rowsBySource=new Map(),nextRow={upper:1,lower:1,final:1};
+ for(const id of order){const match=matches.find(m=>m.id===id),card=matchCard(match);card.dataset.match=id;if(!classic){const sourceRows=[match.homeSource,match.awaySource].filter(v=>!v.includes('-')).map(v=>rowsBySource.get(Number(v.slice(1)))??0);const row=Math.max(nextRow[match.branch],...sourceRows.map(n=>n+1));nextRow[match.branch]=row+1;rowsBySource.set(id,row);card.classList.add('graph-branch-'+match.branch,'graph-row-'+row);}graph.append(card);}
+ graphSection.append(graph);$('finals-bracket').append(graphSection);observeGraph(graph,definitions,resetId);
  $('champion').hidden=!view.champion;$('champion').replaceChildren();if(view.champion)$('champion').append(node('h2','','🏆 War Imperium Champion'),node('strong','',view.champion.name));
  $('finals-losses').hidden=!state;$('finals-losses').replaceChildren();if(state){$('finals-losses').append(node('h2','','Turnierstatus'));const list=node('ul');for(const p of view.players)list.append(node('li','',`${p.name} · ${p.losses} Niederlage${p.losses===1?'':'n'}${p.initialLosses?' (davon 1 zum Start angerechnet)':''} · ${view.champion?.id===p.id?'Champion':p.eliminated?'Ausgeschieden':'Im Turnier'}`));$('finals-losses').append(list);}
 }
 
 let graphObserver;
-function observeGraph(graph){
+function observeGraph(graph,definitions,resetId){
  graphObserver?.disconnect();const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.classList.add('bracket-lines');svg.setAttribute('aria-hidden','true');graph.prepend(svg);
  const draw=()=>{if(!graph.isConnected)return;svg.replaceChildren();const bounds=graph.getBoundingClientRect(),mobile=matchMedia('(max-width:700px)').matches;
-  const edges=[[1,6,false],[2,6,false],[1,3,true],[2,4,true],[3,5,false],[4,5,false],[5,7,false],[6,7,true],[6,8,false],[7,8,false],[8,9,false]];
+  const edges=[];for(const match of definitions){if(match.id===resetId){const finalId=data.state?.finalMatchId??data.preview.finalMatchId??8;edges.push([finalId,resetId,false]);continue;}for(const source of [match.home,match.away])if(!source.includes('-'))edges.push([Number(source.slice(1)),match.id,source[0]==='L']);}
   edges.forEach(([from,to,drop],index)=>{const a=graph.querySelector('[data-match="'+from+'"]').getBoundingClientRect(),b=graph.querySelector('[data-match="'+to+'"]').getBoundingClientRect();let d;
    if(mobile){const x=a.left-bounds.left+a.width*.5,y=a.bottom-bounds.top,tx=b.left-bounds.left+b.width*.5,ty=b.top-bounds.top,lane=drop?3:bounds.width-3;d='M '+x+' '+y+' V '+(y+15)+' H '+lane+' V '+(ty-15)+' H '+tx+' V '+ty;}
    else if(b.left>a.right){const x=a.right-bounds.left,y=a.top-bounds.top+a.height*.5,tx=b.left-bounds.left,ty=b.top-bounds.top+b.height*.5,mid=x+(tx-x)*.5;d='M '+x+' '+y+' H '+mid+' V '+ty+' H '+tx;}
@@ -72,7 +74,7 @@ function observeGraph(graph){
 
 $('start-finals').onclick=()=>{
  if(!data?.preview.ready)return;
- const text=data.preview.unfinished?'Es sind noch Ligaspiele offen. Trotzdem die Finals mit den sechs aktuell angezeigten Teilnehmern starten?':'Die Finals mit den sechs angezeigten Teilnehmern starten?';
+ const text=data.preview.unfinished?'Es sind noch Ligaspiele offen. Trotzdem die Finals mit den aktuell angezeigten Teilnehmern starten?':'Die Finals mit den angezeigten Teilnehmern starten?';
  if(confirm(text+' Die Teilnehmer werden festgehalten.'))mutate({action:'start',leagueRevision:data.preview.leagueRevision,allowUnfinished:data.preview.unfinished});
 };
 $('refresh-finals').onclick=load;document.addEventListener('wi-auth-change',load);load();

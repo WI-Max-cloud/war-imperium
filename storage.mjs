@@ -1,4 +1,4 @@
-import {readFile,writeFile,mkdir,rename} from 'node:fs/promises';
+import {readFile,writeFile,mkdir,rename,unlink} from 'node:fs/promises';
 
 export function createStorage({directory,env=process.env,request=fetch}){
  const remote=!!env.SUPABASE_URL||!!env.SUPABASE_SECRET_KEY;
@@ -16,6 +16,11 @@ export function createStorage({directory,env=process.env,request=fetch}){
  }
  return {
   remote,
+  async remove(key){
+   if(!/^[a-z0-9-]+$/.test(key))throw Error('Ungültiger Speicherschlüssel');
+   if(remote){const url=new URL(base);url.searchParams.set('key','eq.'+key);await call(url,{method:'DELETE',headers:{Prefer:'return=minimal'}});return;}
+   try{await unlink(new URL(key+'.json',directory));}catch(error){if(error.code!=='ENOENT')throw error;}
+  },
   async read(key,fallback){
    if(!/^[a-z0-9-]+$/.test(key))throw Error('Ungültiger Speicherschlüssel');
    if(remote){const url=new URL(base);url.searchParams.set('key','eq.'+key);url.searchParams.set('select','value');const rows=await (await call(url)).json();if(!Array.isArray(rows))throw Error('Ungültige Datenbankantwort');return rows.length?rows[0].value:fallback;}

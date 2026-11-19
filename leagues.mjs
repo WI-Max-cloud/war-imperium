@@ -1,9 +1,9 @@
 import {randomUUID} from 'node:crypto';
 import {prepareLeagues,scheduleLeague} from './league-core.mjs';
-export const emptyLeagues=()=>({revision:0,leagues:[1,2,3].map(id=>({id,name:`Liga ${id}`,players:[]}))});
+export const emptyLeagues=config=>({revision:0,leagues:config?config.leagues.map(rule=>({id:rule.id,name:`Liga ${rule.id}`,players:[],rules:{up:rule.up,down:rule.down,finals:rule.finals}})):[1,2,3].map(id=>({id,name:`Liga ${id}`,players:[]}))});
 export function updateLeagues(state,input){
  const invalid=message=>{const e=Error(message);e.status=400;throw e;};
- if(!input||!['add','remove','result','clearResult'].includes(input.action)||![1,2,3].includes(input.leagueId))invalid('Bitte eine gültige Liga und Aktion wählen.');
+ if(!input||!['add','remove','result','clearResult'].includes(input.action)||!state.leagues.some(l=>l.id===input.leagueId))invalid('Bitte eine gültige Liga und Aktion wählen.');
  if(input.revision!==state.revision){const e=Error('Die Teilnehmerliste wurde inzwischen geändert. Bitte neu laden und erneut versuchen.');e.status=409;throw e;}
  const next=prepareLeagues(structuredClone(state)),league=next.leagues.find(l=>l.id===input.leagueId);
  if(input.action==='add'){

@@ -1,5 +1,5 @@
 import {tournamentUrl,tournamentId} from './tournament-context.mjs';
-import {leagueStandings,leagueZones} from './league-core.mjs';
+import {leagueStandings,leagueZones,leagueRules} from './league-core.mjs';
 const $=id=>document.getElementById(id);
 let state=null,busy=false,isAdmin=false,currentRole=null,canEnterResults=false;
 let selectedLeague=1;const tableOpen=new Map();
@@ -145,7 +145,7 @@ function render(){
  const tab=document.createElement('button');tab.type='button';tab.textContent=league.name;tab.id='league-tab-'+league.id;tab.dataset.league=league.id;tab.setAttribute('role','tab');tab.setAttribute('aria-controls',section.id);tab.onclick=()=>selectLeague(league.id);tabs.append(tab);
   const heading=document.createElement('h2');heading.textContent=league.name;
   const count=document.createElement('small');count.textContent=`${league.players.length} Teilnehmer`;heading.append(count);section.append(heading);
-  const rules=document.createElement('p');rules.className='schedule-note';rules.textContent=league.id===1?'Finals: Plätze 1–4 · Abstieg: letzte 3 Plätze.':league.id===2?'Aufstieg: Plätze 1–3 · Finals: Platz 1 · Abstieg: letzte 3 Plätze.':'Aufstieg: Plätze 1–3 · Finals: Platz 1.';section.append(rules);
+  const rules=document.createElement('p');rules.className='schedule-note';const settings=leagueRules(league,state.leagues.length);rules.textContent=`Finals: ${settings.finals} Plätze · Aufstieg: ${settings.up} Plätze · Abstieg: ${settings.down} Plätze`;section.append(rules);
   const standings=document.createElement('details');standings.className='league-standings';standings.open=tableOpen.get(league.id)??true;const standingsTitle=document.createElement('summary');standingsTitle.textContent='Platzierungen · '+league.name;standings.append(standingsTitle);standings.ontoggle=()=>tableOpen.set(league.id,standings.open);section.append(standings);
   if(!league.players.length){const empty=document.createElement('p');empty.className='league-empty';empty.textContent=isAdmin?'Noch keine Teilnehmer. Füge oben den ersten Spieler hinzu.':'Noch keine Teilnehmer für diese Liga eingetragen.';section.append(empty);}
   else{
@@ -153,7 +153,7 @@ function render(){
    ['Platz','Spieler','Spiele','Punkte','Matchverhältnis',...(isAdmin?['Verwalten']:[])].forEach(value=>{const th=document.createElement('th');th.textContent=value;tr.append(th);});thead.append(tr);table.append(thead);
    const body=document.createElement('tbody');
    leagueStandings(league).forEach((p,index)=>{const row=document.createElement('tr');[index+1,p.name,p.games,p.points,`${p.won}:${p.lost}`].forEach(value=>{const td=document.createElement('td');td.textContent=value;row.append(td);});
-    const zones=leagueZones(league.id,index+1,league.players.length),place=row.firstElementChild;
+    const zones=leagueZones(league.id,index+1,league.players.length,leagueRules(league,state.leagues.length)),place=row.firstElementChild;
     if(zones.length){const badge=document.createElement('span');badge.className='rank-badge '+zones.map(zone=>zone==='Finalsplatz'?'rank-finals':zone==='Aufstiegsplatz'?'rank-up':'rank-down').join(' ');badge.textContent=index+1;badge.title=zones.join(' · ');badge.setAttribute('aria-label',`Platz ${index+1}: ${zones.join(', ')}`);place.replaceChildren(badge);}
     const td=document.createElement('td'),button=document.createElement('button');button.type='button';button.className='remove-player';button.textContent='Entfernen';button.setAttribute('aria-label',`${p.name} aus ${league.name} entfernen`);
     button.onclick=()=>{if(!busy&&confirm(`${p.name} aus ${league.name} entfernen? Alle Begegnungen und Ergebnisse dieses Spielers werden dabei gelöscht und die Tabelle neu berechnet.`))mutate({action:'remove',leagueId:league.id,playerId:p.id});};td.append(button);if(isAdmin)row.append(td);body.append(row);
@@ -168,7 +168,7 @@ function render(){
 async function load(){
  if(busy)return;toggleBusy(true);
  try{const response=await fetch(tournamentUrl('/api/leagues'));const result=await response.json();if(!response.ok)throw Error(result.error||'Laden fehlgeschlagen');state=result.state;isAdmin=result.role==='admin'&&!result.tournament?.archived;currentRole=result.role;canEnterResults=['admin','player','vice'].includes(currentRole)&&!result.tournament?.archived;
-  document.getElementById('participant-form').hidden=!isAdmin;document.getElementById('admin-management').hidden=!isAdmin;
+  document.getElementById('participant-form').hidden=!isAdmin;document.getElementById('admin-management').hidden=!isAdmin;const selected=$('league').value;$('league').replaceChildren(...state.leagues.map(l=>new Option(l.name,String(l.id))));if(state.leagues.some(l=>String(l.id)===selected))$('league').value=selected;
   $('clan-player').replaceChildren(new Option('Spieler manuell eingeben',''),...result.members.sort((a,b)=>a.name.localeCompare(b.name,'de')).map(p=>new Option(`${p.name} (${p.tag})`,JSON.stringify(p))));
   render();$('league-status').textContent='';
  }catch(e){$('league-status').textContent=`Teilnehmer konnten nicht geladen werden. ${e.message}`;}finally{toggleBusy(false);}
@@ -176,7 +176,7 @@ async function load(){
 async function mutate(input){
  if(busy||!state||!canEnterResults)return;toggleBusy(true);$('league-status').textContent='Wird gespeichert …';
  try{const response=await fetch(tournamentUrl('/api/leagues'),{method:'POST',headers:{'Content-Type':'application/json','X-War-Imperium':'local'},body:JSON.stringify({...input,revision:state.revision})});const result=await response.json();if(!response.ok)throw Error(result.error||'Speichern fehlgeschlagen');state=result.state;isAdmin=result.role==='admin'&&!result.tournament?.archived;currentRole=result.role;canEnterResults=['admin','player','vice'].includes(currentRole)&&!result.tournament?.archived;
-  document.getElementById('participant-form').hidden=!isAdmin;document.getElementById('admin-management').hidden=!isAdmin;render();
+  document.getElementById('participant-form').hidden=!isAdmin;document.getElementById('admin-management').hidden=!isAdmin;const selected=$('league').value;$('league').replaceChildren(...state.leagues.map(l=>new Option(l.name,String(l.id))));if(state.leagues.some(l=>String(l.id)===selected))$('league').value=selected;render();
   if(input.action==='add'){$('player-name').value='';$('player-tag').value='';$('clan-player').value='';}
   const messages={add:'Teilnehmer hinzugefügt, Spielplan aktualisiert und gespeichert.',remove:'Teilnehmer entfernt, Tabelle und Spielplan aktualisiert.',result:'Ergebnis gespeichert. Tabelle aktualisiert.',clearResult:'Ergebnis zurückgesetzt. Tabelle aktualisiert.'};
   $('league-status').textContent=messages[input.action];return true;

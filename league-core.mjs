@@ -1,10 +1,12 @@
 const pairingId=(a,b)=>[a,b].sort().join(':');
-export function leagueZones(leagueId,rank,total){
- if(![1,2,3].includes(leagueId)||rank<1||rank>total)return [];
+export function leagueRules(league,count=3){return league.rules??{up:league.id>1?3:0,down:league.id<count?3:0,finals:league.id===1?4:1};}
+export function leagueZones(leagueId,rank,total,rules){
+ if(!Number.isInteger(leagueId)||leagueId<1||rank<1||rank>total)return [];
+ const settings=rules??leagueRules({id:leagueId});
  const zones=[];
- if((leagueId===1&&rank<=4)||(leagueId!==1&&rank===1))zones.push('Finalsplatz');
- if(leagueId>1&&rank<=3)zones.push('Aufstiegsplatz');
- if(leagueId<3&&rank>total-3)zones.push('Abstiegsplatz');
+ if(rank<=settings.finals)zones.push('Finalsplatz');
+ if(rank<=settings.up)zones.push('Aufstiegsplatz');
+ if(rank>total-settings.down)zones.push('Abstiegsplatz');
  return zones;
 }
 export function scheduleLeague(league){

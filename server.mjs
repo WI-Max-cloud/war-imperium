@@ -76,7 +76,7 @@ export const server=http.createServer(async(req,res)=>{
   let body='';for await(const chunk of req){body+=chunk;if(body.length>4096)return send(413,{error:'Anfrage zu groß'});}
   let input;try{input=JSON.parse(body);}catch{return send(400,{error:'Ungültige Eingabe'});}
   if(tournamentCatalogBusy)return send(409,{error:'Speicherung läuft. Bitte erneut versuchen.'});tournamentCatalogBusy=true;
-  try{let next;try{next=updateTournaments(await storage.read('tournaments',defaultTournaments()),input);}catch(e){if(e.status)return send(e.status,{error:e.message});throw e;}await storage.write('tournaments',next);return send(200,{role,...next});}finally{tournamentCatalogBusy=false;}
+  try{let next;try{next=updateTournaments(await storage.read('tournaments',defaultTournaments()),input);}catch(e){if(e.status)return send(e.status,{error:e.message});throw e;}await storage.write('tournaments',next);if(input.action==='delete'){const deletedStorage=tournamentStorage(storage,input.id);await deletedStorage.remove('leagues');await deletedStorage.remove('finals');}return send(200,{role,...next});}finally{tournamentCatalogBusy=false;}
  }
  let tournament;
  if(tournamentPath){tournament=(await storage.read('tournaments',defaultTournaments())).tournaments.find(t=>t.id===selectedTournament);if(!tournament)return send(404,{error:'Turnier nicht gefunden'});if(req.method==='POST'&&tournament.archived)return send(403,{error:'Dieses Turnier ist archiviert. Ein Admin muss es zuerst wieder aktivieren.'});}
@@ -119,7 +119,7 @@ export const server=http.createServer(async(req,res)=>{
   try{const profiles=await storage.read('member-profiles',{});profiles[input.tag]={joinedOn:input.joinedOn,updatedAt:new Date().toISOString(),source:'manual'};await storage.write('member-profiles',profiles);return send(200,{profile:profiles[input.tag]});}finally{membershipBusy=false;}
  }
  if(req.method==='GET'&&req.url==='/api/finals'){
-  const state=await selectedStorage.read('finals',null);return send(200,{role,tournament,state,view:resolveFinals(state),preview:finalsPreview(await selectedStorage.read('leagues',emptyLeagues()))});
+  const state=await selectedStorage.read('finals',null);return send(200,{role,tournament,state,view:resolveFinals(state),preview:finalsPreview(await selectedStorage.read('leagues',emptyLeagues(tournament?.config)))});
  }
  if(req.method==='POST'&&req.url==='/api/finals'){
   if(!sameOrigin(req)||req.headers['x-war-imperium']!=='local')return send(403,{error:'Anfrage nicht erlaubt'});
@@ -129,11 +129,11 @@ export const server=http.createServer(async(req,res)=>{
   if(finalsBusy)return send(409,{error:'Speicherung läuft. Bitte erneut versuchen.'});finalsBusy=true;
   try{
    const current=await selectedStorage.read('finals',null);let next;
-   try{next=updateFinals(current,input,await selectedStorage.read('leagues',emptyLeagues()));}catch(e){if(e.status)return send(e.status,{error:e.message});throw e;}
+   try{next=updateFinals(current,input,await selectedStorage.read('leagues',emptyLeagues(tournament?.config)));}catch(e){if(e.status)return send(e.status,{error:e.message});throw e;}
    await selectedStorage.write('finals',next);return send(200,{role,tournament,state:next,view:resolveFinals(next)});
   }finally{finalsBusy=false;}
  }
- if(req.method==='GET'&&req.url==='/api/leagues')return send(200,{role,tournament,state:prepareLeagues(await selectedStorage.read('leagues',emptyLeagues())),members:role==='admin'?(await roster())?.members??[]:[]});
+ if(req.method==='GET'&&req.url==='/api/leagues')return send(200,{role,tournament,state:prepareLeagues(await selectedStorage.read('leagues',emptyLeagues(tournament?.config))),members:role==='admin'?(await roster())?.members??[]:[]});
  if(req.method==='POST'&&req.url==='/api/leagues'){
   if(!sameOrigin(req)||req.headers['x-war-imperium']!=='local')return send(403,{error:'Anfrage nicht erlaubt'});
   let body='';for await(const chunk of req){body+=chunk;if(body.length>4096)return send(413,{error:'Anfrage zu groß'});}
@@ -141,7 +141,7 @@ export const server=http.createServer(async(req,res)=>{
   if(role!=='admin'&&input?.action!=='result')return send(403,{error:'Mit diesem Zugang können nur Ergebnisse eingetragen oder geändert werden.'});
   if(leaguesBusy)return send(409,{error:'Speicherung läuft. Bitte erneut versuchen.'});leaguesBusy=true;
   try{
-   const current=await selectedStorage.read('leagues',emptyLeagues());let next;
+   const current=await selectedStorage.read('leagues',emptyLeagues(tournament?.config));let next;
    try{next=updateLeagues(current,input);}catch(e){if(e.status)return send(e.status,{error:e.message});throw e;}
    await selectedStorage.write('leagues',next);return send(200,{role,tournament,state:next});
   }finally{leaguesBusy=false;}
@@ -210,7 +210,7 @@ export const server=http.createServer(async(req,res)=>{
    return send(200,{imported:incoming.length,total:merged.size});
   }finally{busy=false;}
  }
- const files={'/turniere':'turniere.html','/turniere.html':'turniere.html','/tournaments-ui.mjs':'tournaments-ui.mjs','/tournament-context.mjs':'tournament-context.mjs','/menu-login.mjs':'menu-login.mjs','/navigation-update.css':'navigation-update.css','/content-ui.mjs':'content-ui.mjs','/content.css':'content.css','/membership.mjs':'membership.mjs','/news':'news.html','/news.html':'news.html','/clans':'clans.html','/clans.html':'clans.html','/clan':'clans.html','/clan.html':'clans.html','/galerie':'galerie.html','/galerie.html':'galerie.html','/admin-auth.mjs':'admin-auth.mjs','/':'home.html','/index.html':'home.html','/home.css':'home.css','/home.mjs':'home.mjs','/home-hero.png':'home-hero.png','/crest.svg':'crest.svg','/clankrieg':'index.html','/clankrieg/':'index.html','/site-auth.mjs':'site-auth.mjs','/site-auth.css':'site-auth.css','/liga':'liga.html','/finals':'finals.html','/finals.html':'finals.html','/finals.mjs':'finals.mjs','/liga.html':'liga.html','/liga.mjs':'liga.mjs','/liga.css':'liga.css','/league-core.mjs':'league-core.mjs','/finals-core.mjs':'finals-core.mjs','/app.mjs':'app.mjs','/core.mjs':'core.mjs','/membership.mjs':'membership.mjs','/export.mjs':'export.mjs','/responsive.mjs':'responsive.mjs','/style.css':'style.css'};
+ const files={'/tournament-config.mjs':'tournament-config.mjs','/finals-builder.mjs':'finals-builder.mjs','/turniere':'turniere.html','/turniere.html':'turniere.html','/tournaments-ui.mjs':'tournaments-ui.mjs','/tournament-context.mjs':'tournament-context.mjs','/menu-login.mjs':'menu-login.mjs','/navigation-update.css':'navigation-update.css','/content-ui.mjs':'content-ui.mjs','/content.css':'content.css','/membership.mjs':'membership.mjs','/news':'news.html','/news.html':'news.html','/clans':'clans.html','/clans.html':'clans.html','/clan':'clans.html','/clan.html':'clans.html','/galerie':'galerie.html','/galerie.html':'galerie.html','/admin-auth.mjs':'admin-auth.mjs','/':'home.html','/index.html':'home.html','/home.css':'home.css','/home.mjs':'home.mjs','/home-hero.png':'home-hero.png','/crest.svg':'crest.svg','/clankrieg':'index.html','/clankrieg/':'index.html','/site-auth.mjs':'site-auth.mjs','/site-auth.css':'site-auth.css','/liga':'liga.html','/finals':'finals.html','/finals.html':'finals.html','/finals.mjs':'finals.mjs','/liga.html':'liga.html','/liga.mjs':'liga.mjs','/liga.css':'liga.css','/league-core.mjs':'league-core.mjs','/finals-core.mjs':'finals-core.mjs','/app.mjs':'app.mjs','/core.mjs':'core.mjs','/membership.mjs':'membership.mjs','/export.mjs':'export.mjs','/responsive.mjs':'responsive.mjs','/style.css':'style.css'};
  if(req.method!=='GET'||!files[req.url])return send(404,{error:'Nicht gefunden'});
  res.writeHead(200,{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Type':req.url.endsWith('.png')?'image/png':req.url.endsWith('.svg')?'image/svg+xml':req.url.endsWith('.mjs')?'text/javascript':req.url.endsWith('.css')?'text/css':'text/html; charset=utf-8','Content-Security-Policy':"default-src 'self'; img-src 'self' blob:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"});
  res.end(await readFile(new URL(files[req.url],root)));
