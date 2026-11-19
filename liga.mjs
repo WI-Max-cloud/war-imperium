@@ -149,15 +149,16 @@ function render(){
   if(!league.players.length){const empty=document.createElement('p');empty.className='league-empty';empty.textContent=isAdmin?'Noch keine Teilnehmer. Füge oben den ersten Spieler hinzu.':'Noch keine Teilnehmer für diese Liga eingetragen.';section.append(empty);}
   else{
    const scroll=document.createElement('div');scroll.className='table';const table=document.createElement('table'),thead=document.createElement('thead'),tr=document.createElement('tr');
-   ['Platz','Spieler','Spiele','Punkte','Matchverhältnis','Qualifikation',...(isAdmin?['Verwalten']:[])].forEach(value=>{const th=document.createElement('th');th.textContent=value;tr.append(th);});thead.append(tr);table.append(thead);
+   ['Platz','Spieler','Spiele','Punkte','Matchverhältnis',...(isAdmin?['Verwalten']:[])].forEach(value=>{const th=document.createElement('th');th.textContent=value;tr.append(th);});thead.append(tr);table.append(thead);
    const body=document.createElement('tbody');
    leagueStandings(league).forEach((p,index)=>{const row=document.createElement('tr');[index+1,p.name,p.games,p.points,`${p.won}:${p.lost}`].forEach(value=>{const td=document.createElement('td');td.textContent=value;row.append(td);});
-    const qualifications=document.createElement('td');qualifications.className='qualification-cell';
-    for(const zone of leagueZones(league.id,index+1,league.players.length)){const badge=document.createElement('span');badge.className='qualification-badge '+(zone==='Finalsplatz'?'zone-finals':zone==='Aufstiegsplatz'?'zone-up':'zone-down');badge.textContent=zone;qualifications.append(badge);}
-    if(!qualifications.childNodes.length)qualifications.textContent='—';row.append(qualifications);
+    const zones=leagueZones(league.id,index+1,league.players.length),place=row.firstElementChild;
+    if(zones.length){const badge=document.createElement('span');badge.className='rank-badge '+zones.map(zone=>zone==='Finalsplatz'?'rank-finals':zone==='Aufstiegsplatz'?'rank-up':'rank-down').join(' ');badge.textContent=index+1;badge.title=zones.join(' · ');badge.setAttribute('aria-label',`Platz ${index+1}: ${zones.join(', ')}`);place.replaceChildren(badge);}
     const td=document.createElement('td'),button=document.createElement('button');button.type='button';button.className='remove-player';button.textContent='Entfernen';button.setAttribute('aria-label',`${p.name} aus ${league.name} entfernen`);
     button.onclick=()=>{if(!busy&&confirm(`${p.name} aus ${league.name} entfernen? Alle Begegnungen und Ergebnisse dieses Spielers werden dabei gelöscht und die Tabelle neu berechnet.`))mutate({action:'remove',leagueId:league.id,playerId:p.id});};td.append(button);if(isAdmin)row.append(td);body.append(row);
    });table.append(body);scroll.append(table);standings.append(scroll);
+   const legend=document.createElement('p');legend.className='rank-legend';
+   for(const [label,color] of [['Finalsplatz','finals'],['Aufstiegsplatz','up'],['Abstiegsplatz','down']]){const item=document.createElement('span'),dot=document.createElement('i');dot.className='rank-dot rank-dot-'+color;dot.setAttribute('aria-hidden','true');item.append(dot,document.createTextNode(label));legend.append(item);}standings.append(legend);
   }
   renderSchedule(league,section);$('league-tables').append(section);
  }
