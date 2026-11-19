@@ -9,9 +9,9 @@
 <main>
 <p class="eyebrow">DREI LIGEN. EIN IMPERIUM.</p>
 <h1>War Imperium Liga</h1>
-<p>Teilnehmer einteilen und alle drei Ligen im Blick behalten.</p>
-<section class="panel league-menu">
-<h2>Ligaübersicht</h2>
+
+<details class="panel league-menu" id="admin-management" hidden>
+<summary>Teilnehmer verwalten</summary>
 <form id="participant-form" hidden>
 <label>Aus dem Clan auswählen (optional)<select id="clan-player"><option value="">Spieler manuell eingeben</option></select></label>
 <div class="league-form-row">
@@ -21,9 +21,9 @@
 </div>
 <button id="add-player" type="submit" disabled>Teilnehmer hinzufügen</button>
 </form>
-<p id="league-status" role="status" aria-live="polite">Teilnehmer werden geladen …</p>
 
-</section>
+
+</details><p id="league-status" role="status" aria-live="polite"></p>
 <div id="league-tables" class="league-tables"></div>
 <p class="league-note">Sieg: 3 Punkte · Niederlage: 0 Punkte · Sonderwertung 0:0: ein absolviertes Spiel und 0 Punkte für beide. Andere Unentschieden sind nicht vorgesehen. Sortierung: Punkte, Matchdifferenz (gewonnene minus verlorene Matches), dann gewonnene Matches. Bei vollständiger Gleichheit entscheidet der Name über die Anzeigereihenfolge. Neue Teilnehmer ergänzen den Spielplan; vorhandene Ergebnisse bleiben erhalten.</p>
 <footer>War Imperium Liga · Clan #22QJG0</footer>
