@@ -1,0 +1,5 @@
+export const tournamentId=new URLSearchParams(location.search).get('tournament')||'current';
+export const tournamentUrl=path=>path+'?tournament='+encodeURIComponent(tournamentId);
+const back=document.createElement('a');back.href='/turniere';back.className='finals-link';back.textContent='← Alle Turniere';document.querySelector('main h1')?.after(back);
+document.querySelectorAll('main a[href="/liga"],main a[href="/finals"]').forEach(link=>link.href=tournamentUrl(link.getAttribute('href')));
+try{const r=await fetch('/api/tournaments');if(r.ok){const data=await r.json(),t=data.tournaments.find(t=>t.id===tournamentId);if(t){const heading=document.querySelector('main h1');heading.textContent=location.pathname.startsWith('/finals')?t.name+' · Finals':t.name;document.title=heading.textContent+' · War Imperium';if(t.archived){const note=document.createElement('p');note.className='tournament-archive-note';note.textContent='Archiviertes Turnier · Ergebnisse sind nur lesbar.';heading.after(note);}}}}catch{}

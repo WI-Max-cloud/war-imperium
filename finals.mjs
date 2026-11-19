@@ -1,3 +1,4 @@
+import {tournamentUrl} from './tournament-context.mjs';
 import {resolveFinals,finalsDefinitions} from './finals-core.mjs';
 const $=id=>document.getElementById(id);let data=null,busy=false;
 const sourceLabel=source=>source.includes('-')?`Liga ${source[1]} · Platz ${source.split('-')[1]}`:`${source[0]==='W'?'Sieger':'Verlierer'} Spiel ${source.slice(1)}`;
@@ -5,14 +6,14 @@ function node(tag,className,text){const element=document.createElement(tag);if(c
 function setBusy(value){busy=value;document.querySelectorAll('#finals-bracket button,#finals-bracket .finals-score,#refresh-finals').forEach(b=>b.disabled=value);$('start-finals').disabled=value||data?.role!=='admin'||!!data?.state||!data?.preview?.ready;}
 async function load(){
  if(busy)return;setBusy(true);$('finals-status').textContent='Finals werden geladen …';
- try{const response=await fetch('/api/finals');const result=await response.json();if(!response.ok)throw Error(result.error||'Laden fehlgeschlagen');data=result;render();$('finals-status').textContent='Stand geladen. Ergebnisse werden dauerhaft gespeichert.';}
+ try{const response=await fetch(tournamentUrl('/api/finals'));const result=await response.json();if(!response.ok)throw Error(result.error||'Laden fehlgeschlagen');data=result;render();$('finals-status').textContent='Stand geladen. Ergebnisse werden dauerhaft gespeichert.';}
  catch(e){$('finals-status').textContent=e.message;}finally{setBusy(false);}
 }
 async function mutate(input){
  if(busy||!['admin','player','vice'].includes(data?.role))return false;setBusy(true);$('finals-status').textContent='Wird gespeichert …';
  try{
   const payload={...input,revision:data.state?.revision??0};
-  const send=()=>fetch('/api/finals',{method:'POST',headers:{'Content-Type':'application/json','X-War-Imperium':'local'},body:JSON.stringify(payload)});
+  const send=()=>fetch(tournamentUrl('/api/finals'),{method:'POST',headers:{'Content-Type':'application/json','X-War-Imperium':'local'},body:JSON.stringify(payload)});
   let response=await send(),result=await response.json();
   if(response.status===409&&result.error?.includes('Folgeergebnisse')){
    if(!confirm(result.error+' Fortfahren?')){$('finals-status').textContent='Änderung abgebrochen.';return false;}
@@ -30,7 +31,7 @@ function matchCard(match){
  }
  if(!match.active){card.append(node('p','schedule-note','Nur nötig, wenn der Lower-Bracket-Sieger Spiel 8 gewinnt.'));return card;}
  if(!match.ready){card.append(node('p','schedule-note','Wartet auf vorherige Ergebnisse.'));return card;}
- if(!['admin','player','vice'].includes(data.role)){card.append(node('p','read-only-note','Zum Eintragen eines Ergebnisses oben anmelden.'));return card;}
+ if(data.tournament?.archived||!['admin','player','vice'].includes(data.role)){card.append(node('p','read-only-note',data.tournament?.archived?'Archiviertes Turnier · nur Lesen.':'Zum Eintragen eines Ergebnisses oben anmelden.'));return card;}
  const form=node('form','finals-result'),left=node('label','',match.home.name),right=node('label','',match.away.name);
  const score=side=>{const input=node('input','finals-score');input.type='number';input.min='0';input.max='99';input.step='1';input.inputMode='numeric';input.required=true;input.value=match[side+'Score']??'';input.setAttribute('aria-label',`Spiel ${match.id}: gewonnene Matches von ${match[side].name}`);return input;};
  const home=score('home'),away=score('away');left.append(home);right.append(away);form.append(left,node('span','',':'),right);
@@ -44,7 +45,7 @@ function render(){
  $('seeds-title').textContent=state?'Festgelegte Finals-Teilnehmer':'Teilnehmer nach aktuellem Ligastand';
  $('seed-note').textContent=state?`Start: ${new Date(state.startedAt).toLocaleString('de-DE')}. Die Teilnehmer bleiben fest, auch wenn sich die Ligatabellen später ändern.`:'Vor dem Start die sechs Plätze prüfen. Bei vollständiger Gleichheit gilt die bisherige alphabetische Tabellenreihenfolge.';
  for(const seed of state?.seeds??data.preview.slots){const card=node('article','finals-slot');card.append(node('h3','',`Liga ${seed.leagueId} · Platz ${seed.rank}`),node('strong','',seed.player?.name??'Noch nicht besetzt'),node('p','',seed.leagueId===1?'Upper Bracket · 0 Niederlagen zum Start':'Lower Bracket · 1 Niederlage angerechnet'));$('finals-slots').append(card);}
- $('start-finals').hidden=!!state||data.role!=='admin';$('finals-bracket').replaceChildren();
+ $('start-finals').hidden=!!state||data.role!=='admin'||data.tournament?.archived;$('finals-bracket').replaceChildren();
  const matches=state?view.matches:finalsDefinitions.map(m=>({...m,home:null,away:null,homeSource:m.home,awaySource:m.away,active:m.id!==9,ready:false,homeScore:null,awayScore:null}));
  const graphSection=node('section','panel finals-graph-section');graphSection.append(node('h2','','War Imperium Finals · Turnierbaum'));
  const legend=node('p','bracket-legend');legend.textContent='Blaue Linie: Sieger weiter · Rote gestrichelte Linie: Verlierer ins Lower Bracket · Spiel 9 nur bei erforderlichem Reset';graphSection.append(legend);

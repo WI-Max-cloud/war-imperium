@@ -1,14 +1,15 @@
+import {tournamentUrl,tournamentId} from './tournament-context.mjs';
 import {leagueStandings,leagueZones} from './league-core.mjs';
 const $=id=>document.getElementById(id);
 let state=null,busy=false,isAdmin=false,currentRole=null,canEnterResults=false;
 let selectedLeague=1;const tableOpen=new Map();
-const tabs=document.createElement('div');tabs.className='league-tabs';tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Liga auswählen');const leagueNavigation=document.createElement('div');leagueNavigation.className='league-navigation';const finalsLink=document.createElement('a');finalsLink.href='/finals';finalsLink.className='league-finals-tab';finalsLink.textContent='War Imperium Finals';leagueNavigation.append(tabs,finalsLink);document.getElementById('league-tables').before(leagueNavigation);
+const tabs=document.createElement('div');tabs.className='league-tabs';tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Liga auswählen');const leagueNavigation=document.createElement('div');leagueNavigation.className='league-navigation';const finalsLink=document.createElement('a');finalsLink.href=tournamentUrl('/finals');finalsLink.className='league-finals-tab';finalsLink.textContent='War Imperium Finals';leagueNavigation.append(tabs,finalsLink);document.getElementById('league-tables').before(leagueNavigation);
 function selectLeague(id,focus=false){selectedLeague=id;for(const tab of tabs.children){const active=Number(tab.dataset.league)===id;tab.setAttribute('aria-selected',String(active));tab.tabIndex=active?0:-1;if(active&&focus)tab.focus();}document.querySelectorAll('[data-league-panel]').forEach(panel=>panel.hidden=Number(panel.dataset.leaguePanel)!==id);}
 tabs.onkeydown=event=>{const ids=[...tabs.children].map(b=>Number(b.dataset.league)),index=ids.indexOf(selectedLeague);let next;if(event.key==='ArrowRight')next=ids[(index+1)%ids.length];if(event.key==='ArrowLeft')next=ids[(index+ids.length-1)%ids.length];if(event.key==='Home')next=ids[0];if(event.key==='End')next=ids.at(-1);if(next){event.preventDefault();selectLeague(next,true);}};
 const openRounds=new Set();
 const openOnlyLeagues=new Set();
 let jpgExportBusy=false;
-function jpgPages(league,createdAt){
+function jpgPages(league,createdAt,tournamentName){
  const names=new Map(league.players.map(p=>[p.id,p.name]));
  const matches=(league.matches??[]).filter(m=>m.homeScore==null||m.awayScore==null).sort((a,b)=>a.round-b.round);
  const pages=[];for(let i=0;i<matches.length;i+=10)pages.push(matches.slice(i,i+10));
@@ -16,7 +17,7 @@ function jpgPages(league,createdAt){
   const canvas=document.createElement('canvas');canvas.width=1200;canvas.height=420+page.length*146;const ctx=canvas.getContext('2d');
   const bg=ctx.createLinearGradient(0,0,1200,canvas.height);bg.addColorStop(0,'#03172d');bg.addColorStop(1,'#020912');ctx.fillStyle=bg;ctx.fillRect(0,0,1200,canvas.height);
   ctx.fillStyle='#f52d4a';ctx.fillRect(48,42,1104,6);ctx.fillStyle='#74ddff';ctx.fillRect(48,canvas.height-46,1104,2);
-  ctx.fillStyle='#94c4df';ctx.font='bold 18px Arial';ctx.fillText('WAR IMPERIUM  /  LIGA & FINALS',60,95);
+  ctx.fillStyle='#94c4df';ctx.font='bold 18px Arial';ctx.fillText('WAR IMPERIUM  /  '+(tournamentName||'LIGA & FINALS'),60,95,1080);
   ctx.fillStyle='#fff';ctx.font='italic bold 62px Arial';ctx.fillText('OFFENE SPIELE',58,170);ctx.fillStyle='#ff425d';ctx.font='bold 36px Arial';ctx.fillText(league.name,60,225);
   ctx.fillStyle='#bdd0e4';ctx.font='22px Arial';ctx.fillText(`${matches.length} offene Begegnungen  ·  Jeder gegen jeden`,60,272);
   ctx.strokeStyle='#2b526e';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(60,300);ctx.lineTo(1140,300);ctx.stroke();
@@ -33,15 +34,15 @@ function jpgPages(league,createdAt){
 async function exportOpenMatchesJpg(leagueId,trigger){
  if(currentRole!=='admin'||busy||jpgExportBusy)return;jpgExportBusy=true;trigger.disabled=true;const urls=[];
  try{
-  const response=await fetch('/api/leagues');const result=await response.json();if(!response.ok)throw Error(result.error||'Abruf fehlgeschlagen');if(result.role!=='admin')throw Error('Bitte als Admin anmelden.');
-  const league=result.state.leagues.find(l=>l.id===leagueId);if(!league)throw Error('Liga nicht gefunden');const createdAt=new Date(),pages=jpgPages(league,createdAt);
+  const response=await fetch(tournamentUrl('/api/leagues'));const result=await response.json();if(!response.ok)throw Error(result.error||'Abruf fehlgeschlagen');if(result.role!=='admin')throw Error('Bitte als Admin anmelden.');
+  const league=result.state.leagues.find(l=>l.id===leagueId);if(!league)throw Error('Liga nicht gefunden');const createdAt=new Date(),pages=jpgPages(league,createdAt,result.tournament?.name);
   if(!pages.length){$('league-status').textContent='Keine offenen Spiele in dieser Liga.';return;}
   const dialog=document.createElement('dialog');dialog.className='jpg-export-dialog';dialog.setAttribute('aria-label','Offene Spiele als JPG speichern');
   const title=document.createElement('h2');title.textContent=league.name+' · Offene Spiele';const note=document.createElement('p');note.textContent=pages.length===1?'Speichere das Bild über den Button unter der Vorschau.':`${pages.length} Bilder mit jeweils höchstens 10 Spielen. Speichere die gewünschten Seiten einzeln.`;const close=document.createElement('button');close.type='button';close.textContent='Schließen';close.onclick=()=>dialog.close();dialog.append(title,note,close);
   for(const [index,draw] of pages.entries()){const canvas=draw();
    const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.94));if(!blob)throw Error('Bild konnte nicht erstellt werden');const url=URL.createObjectURL(blob);urls.push(url);
    const figure=document.createElement('figure'),img=document.createElement('img');img.loading='lazy';img.src=url;img.alt=`Offene Spiele · ${league.name} · Seite ${index+1}`;img.width=canvas.width;img.height=canvas.height;canvas.width=canvas.height=1;
-   const link=document.createElement('a');link.href=url;link.download=`War-Imperium-Liga-${league.id}-offene-Spiele-${createdAt.toISOString().slice(0,10)}-${index+1}.jpg`;link.className='jpg-download';link.textContent=pages.length===1?'JPG-Bild speichern':`JPG-Bild ${index+1} speichern`;figure.append(img,link);dialog.append(figure);
+   const link=document.createElement('a');link.href=url;link.download=`War-Imperium-${tournamentId}-Liga-${league.id}-offene-Spiele-${createdAt.toISOString().slice(0,10)}-${index+1}.jpg`;link.className='jpg-download';link.textContent=pages.length===1?'JPG-Bild speichern':`JPG-Bild ${index+1} speichern`;figure.append(img,link);dialog.append(figure);
   }
   dialog.addEventListener('close',()=>{urls.forEach(url=>URL.revokeObjectURL(url));dialog.remove();},{once:true});document.body.append(dialog);dialog.showModal();close.focus();$('league-status').textContent='JPG-Export erstellt. Er enthält den aktuell gespeicherten Stand.';
  }catch(error){urls.forEach(url=>URL.revokeObjectURL(url));$('league-status').textContent=error.message;}finally{jpgExportBusy=false;trigger.disabled=false;}
@@ -54,7 +55,7 @@ function printMatchdays(league,from,to){
  const matches=(league.matches??[]).filter(m=>m.round>=from&&m.round<=to);
  if(!matches.length)return;
  pdfReport.replaceChildren();
- const title=document.createElement('h2');title.textContent=`War Imperium Liga · ${league.name}`;
+ const title=document.createElement('h2');title.textContent=`${document.querySelector('main h1')?.textContent||'War Imperium Liga'} · ${league.name}`;
  const summary=document.createElement('p');summary.textContent=`${from===to?'Spieltag '+from:'Spieltage '+from+' bis '+to} · Stand: ${new Date().toLocaleString('de-DE')}`;
  const note=document.createElement('p');note.textContent='Gespeicherte Ergebnisse; „Offen“ bedeutet noch kein Ergebnis. 0:0 zählt als absolviertes Spiel mit 0 Punkten für beide.';
  pdfReport.append(title,summary,note);
@@ -166,7 +167,7 @@ function render(){
 }
 async function load(){
  if(busy)return;toggleBusy(true);
- try{const response=await fetch('/api/leagues');const result=await response.json();if(!response.ok)throw Error(result.error||'Laden fehlgeschlagen');state=result.state;isAdmin=result.role==='admin';currentRole=result.role;canEnterResults=['admin','player','vice'].includes(currentRole);
+ try{const response=await fetch(tournamentUrl('/api/leagues'));const result=await response.json();if(!response.ok)throw Error(result.error||'Laden fehlgeschlagen');state=result.state;isAdmin=result.role==='admin'&&!result.tournament?.archived;currentRole=result.role;canEnterResults=['admin','player','vice'].includes(currentRole)&&!result.tournament?.archived;
   document.getElementById('participant-form').hidden=!isAdmin;document.getElementById('admin-management').hidden=!isAdmin;
   $('clan-player').replaceChildren(new Option('Spieler manuell eingeben',''),...result.members.sort((a,b)=>a.name.localeCompare(b.name,'de')).map(p=>new Option(`${p.name} (${p.tag})`,JSON.stringify(p))));
   render();$('league-status').textContent='';
@@ -174,7 +175,7 @@ async function load(){
 }
 async function mutate(input){
  if(busy||!state||!canEnterResults)return;toggleBusy(true);$('league-status').textContent='Wird gespeichert …';
- try{const response=await fetch('/api/leagues',{method:'POST',headers:{'Content-Type':'application/json','X-War-Imperium':'local'},body:JSON.stringify({...input,revision:state.revision})});const result=await response.json();if(!response.ok)throw Error(result.error||'Speichern fehlgeschlagen');state=result.state;isAdmin=result.role==='admin';currentRole=result.role;canEnterResults=['admin','player','vice'].includes(currentRole);
+ try{const response=await fetch(tournamentUrl('/api/leagues'),{method:'POST',headers:{'Content-Type':'application/json','X-War-Imperium':'local'},body:JSON.stringify({...input,revision:state.revision})});const result=await response.json();if(!response.ok)throw Error(result.error||'Speichern fehlgeschlagen');state=result.state;isAdmin=result.role==='admin'&&!result.tournament?.archived;currentRole=result.role;canEnterResults=['admin','player','vice'].includes(currentRole)&&!result.tournament?.archived;
   document.getElementById('participant-form').hidden=!isAdmin;document.getElementById('admin-management').hidden=!isAdmin;render();
   if(input.action==='add'){$('player-name').value='';$('player-tag').value='';$('clan-player').value='';}
   const messages={add:'Teilnehmer hinzugefügt, Spielplan aktualisiert und gespeichert.',remove:'Teilnehmer entfernt, Tabelle und Spielplan aktualisiert.',result:'Ergebnis gespeichert. Tabelle aktualisiert.',clearResult:'Ergebnis zurückgesetzt. Tabelle aktualisiert.'};
