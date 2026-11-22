@@ -16,7 +16,8 @@ export function updateContent(current,input){
   next.goals=input.goals.map(g=>({title:text(g.title,100),text:text(g.text,350)}));
  }else if(input.action==='news-add'){
   if(next.news.length>=100)throw fail('Maximal 100 News. Bitte zuerst einen alten Beitrag löschen.');
-  next.news.unshift({id:randomUUID(),title:text(input.title,150),text:text(input.text,10000),createdAt:now});
+  const category=input.category??'clan';if(!['turnier','liga','finals','clan'].includes(category))throw fail('Bitte eine gültige News-Kategorie auswählen.');
+  next.news.unshift({id:randomUUID(),title:text(input.title,150),text:text(input.text,10000),category,createdAt:now});
  }else if(input.action==='news-delete'||input.action==='image-delete'){
   const list=input.action==='news-delete'?'news':'gallery';if(!next[list].some(n=>n.id===input.id))throw fail('Eintrag nicht gefunden.',404);next[list]=next[list].filter(n=>n.id!==input.id);
  }else if(input.action==='image-add'){
