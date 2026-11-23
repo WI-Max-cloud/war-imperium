@@ -7,7 +7,15 @@ export function cardLevel(card,catalog=[]){
  if(!Number.isInteger(card.level)||card.level<1||offsets[rarity]===undefined)return null;
  return card.level+offsets[rarity];
 }
-export function summarizePlayer(p,catalog=null){
+export function accountAgeFromBadges(badges,now=new Date()){
+ const totalDays=badges?.find(b=>b.name==='YearsPlayed')?.progress;
+ if(!Number.isInteger(totalDays)||totalDays<=0||totalDays>20000)return null;
+ // Interpret the day counter on a calendar date, without inventing an exact creation time.
+ const asOf=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Berlin',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
+ const estimatedCreatedOn=new Date(Date.parse(asOf+'T00:00:00Z')-totalDays*86400000).toISOString().slice(0,10);
+ return {totalDays,years:Math.floor(totalDays/365),weeks:Math.floor(totalDays%365/7),days:totalDays%365%7,estimatedCreatedOn,asOf,source:'YearsPlayed'};
+}
+export function summarizePlayer(p,catalog=null,now=new Date()){
  const items=Array.isArray(catalog?.items)?catalog.items:[];
  const card=c=>({id:c.id,name:c.name??'Karte',level:cardLevel(c,items),rarity:c.rarity??items.find(i=>i.id===c.id)?.rarity??null,evolutionLevel:c.evolutionLevel??null,starLevel:c.starLevel??null,elixirCost:c.elixirCost??null});
  const cards=[...new Map((p.cards??[]).map(c=>[c.id,card(c)])).values()];
@@ -20,7 +28,7 @@ export function summarizePlayer(p,catalog=null){
   cards:{items:cards,count16:unknown?null:count16,knownCount16:count16,total:items.length||null,owned:cards.length,unknown,percent16:items.length&&!unknown?count16/items.length*100:null,distribution},
   currentDeck:(p.currentDeck??[]).map(card),supportCards:(p.supportCards??[]).map(card),currentSupportCards:(p.currentDeckSupportCards??[]).map(card),favoriteCard:p.currentFavouriteCard?card(p.currentFavouriteCard):null,
   badges:(p.badges??[]).map(b=>({name:b.name,level:b.level,progress:b.progress,target:b.target})),achievements:(p.achievements??[]).map(a=>({name:a.name,value:a.value,target:a.target,stars:a.stars})),
-  accountCreatedAt:null,accountAge:null,updatedAt:new Date().toISOString()};
+  accountCreatedAt:null,accountAge:accountAgeFromBadges(p.badges,now),updatedAt:now.toISOString()};
 }
 export function playerStatistics(storage,api,configured=()=>true){
  const cache=new Map(),pending=new Map();

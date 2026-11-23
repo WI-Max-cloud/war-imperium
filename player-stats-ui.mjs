@@ -12,7 +12,11 @@ function cards(host,items){
 function render(d){
  result.replaceChildren();
  const profile=section(d.name);profile.append(el('p',`${d.tag} · ${d.clan?.name??'Kein Clan'} ${d.clan?.tag??''}`));
- facts(profile,[['Account-Gründungsdatum','Nicht über die API verfügbar'],['Account-Alter','Nicht über die API verfügbar'],['Rolle im Clan',({member:'Mitglied',elder:'Ältester',coLeader:'Vize-Anführer',leader:'Anführer'})[d.role]??d.role??'Nicht verfügbar'],['Datenstand',new Date(d.updatedAt).toLocaleString('de-DE')]]);
+ const age=d.accountAge;
+ const ageText=age?[[age.years,'Jahr','Jahre'],[age.weeks,'Woche','Wochen'],[age.days,'Tag','Tage']].map(([value,singular,plural])=>`${value} ${value===1?singular:plural}`).join(', '):'Nicht über die API verfügbar';
+ const createdOn=age?.estimatedCreatedOn?age.estimatedCreatedOn.split('-').reverse().join('.'):null;
+ facts(profile,[['Account-Gründungsdatum',createdOn?`ca. ${createdOn} (berechnet)`:'Nicht über die API verfügbar'],['Account-Alter',ageText],['Rolle im Clan',({member:'Mitglied',elder:'Ältester',coLeader:'Vize-Anführer',leader:'Anführer'})[d.role]??d.role??'Nicht verfügbar'],['Datenstand',new Date(d.updatedAt).toLocaleString('de-DE')]]);
+ if(age)profile.append(el('p',`${number(age.totalDays)} Tage laut Alters-Abzeichen · Jahre mit 365 Tagen, Rest in Wochen und Tagen. Das Gründungsdatum ist zurückgerechnet; einen exakten Erstellungszeitpunkt liefert die API nicht.`));
  const collection=section('Kartenstatistiken');facts(collection,[['Karten auf Level 16',d.cards.count16===null?`${number(d.cards.knownCount16)} sicher bekannt`:number(d.cards.count16)],['Anteil aller Karten auf Level 16',d.cards.percent16===null?'Nicht verfügbar':number(d.cards.percent16)+' %'],['Freigeschaltete Karten',number(d.cards.owned)],['Karten im API-Katalog',number(d.cards.total)]]);
  collection.append(el('p','Der Anteil bezieht sich auf alle Karten im aktuellen Kartenkatalog, einschließlich noch nicht freigeschalteter Karten. Turmtruppen werden separat aufgeführt.'));
  if(d.cards.unknown)collection.append(el('p',`${d.cards.unknown} Karten ohne auswertbares Level. Eine vollständige Level-16-Quote ist deshalb nicht verfügbar.`));
