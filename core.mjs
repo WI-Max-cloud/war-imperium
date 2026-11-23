@@ -13,10 +13,10 @@ export function filterMembers(rows, members, enabled) {
   const tags = new Set((members || []).map(m => m.tag));
   return rows.filter(row => tags.has(row.tag));
 }
-export function parseLog(items) {
+export function parseLog(items,clanTag='#22QJG0') {
   return items.map(item => {
     if (!Number.isInteger(item.seasonId) || !Number.isInteger(item.sectionIndex)) throw Error('Unbekanntes Wochenformat');
-    const clan = item.standings?.find(s => s.clan?.tag === '#22QJG0')?.clan;
+    const clan = item.standings?.find(s => s.clan?.tag === clanTag)?.clan;
     if (!Array.isArray(clan?.participants)) throw Error('Clan oder Teilnehmer fehlen im API-Ergebnis');
     return {id: `${item.seasonId}-${item.sectionIndex}`, season: item.seasonId, section: item.sectionIndex, date: item.createdDate, players: clan.participants.map(p => {
       if (typeof p.tag !== 'string' || typeof p.name !== 'string' || !Number.isInteger(p.fame) || p.fame < 0 || !Number.isInteger(p.decksUsed) || p.decksUsed < 0) throw Error('Punkte oder decksUsed fehlen/ungültig');

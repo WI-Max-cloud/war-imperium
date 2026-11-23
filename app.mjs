@@ -1,6 +1,11 @@
 import {rankings,filterMembers,weeklyTrend,attendanceWeeks,missingAttacks} from './core.mjs';
 import {scoreBand} from './export.mjs';
 const $=id=>document.getElementById(id);let weeks=[],demo=false,roster=null,appRole='vice';
+const activeClan=new URLSearchParams(location.search).get('clan')||'22QJG0';
+const clanName=activeClan==='22QJG0'?'War Imperium':'War Imperium II';
+const endpoint=path=>path+'?clan='+encodeURIComponent(activeClan);
+const clanSelect=$('war-clan');clanSelect.value=activeClan;clanSelect.onchange=()=>location.assign('/clankrieg?clan='+encodeURIComponent(clanSelect.value));
+$('war-clan-name').textContent=clanName;
 let savedAbsences={},demoAbsences={};
 const attendancePanel=document.createElement('section');attendancePanel.className='panel attendance-panel';
 const attendanceTitle=document.createElement('h2');attendanceTitle.textContent='Fehlende Angriffe · Abmeldungen';
@@ -27,7 +32,7 @@ function renderAttendance(){
   checkbox.onchange=async()=>{
    const value=checkbox.checked,isDemo=demo;checkbox.disabled=true;feedback.textContent='Wird gespeichert …';
    try{
-    if(!isDemo){const response=await fetch('/api/absence',{method:'POST',headers:{'Content-Type':'application/json','X-War-Imperium':'local'},body:JSON.stringify({weekId:week.id,tag:player.tag,excused:value})});const result=await response.json();if(!response.ok)throw Error(result.error||'Speichern fehlgeschlagen');}
+    if(!isDemo){const response=await fetch(endpoint('/api/absence'),{method:'POST',headers:{'Content-Type':'application/json','X-War-Imperium':'local'},body:JSON.stringify({weekId:week.id,tag:player.tag,excused:value})});const result=await response.json();if(!response.ok)throw Error(result.error||'Speichern fehlgeschlagen');}
     const target=isDemo?demoAbsences:savedAbsences;target[week.id]??={};target[week.id][player.tag]=value;feedback.textContent=value?'Abgemeldet':'Nicht abgemeldet';
    }catch(e){checkbox.checked=!value;feedback.textContent=`Nicht gespeichert: ${e.message}`;}finally{checkbox.disabled=false;}
   };
@@ -46,7 +51,7 @@ async function loadPlacements(){
  if(loadingPlacements)return;
  loadingPlacements=true;placementButton.disabled=true;placementStatus.textContent='Aktuelle Ranglisten werden geprüft …';
  try{
-  const response=await fetch('/api/placements',appRole==='admin'?{method:'POST',headers:{'X-War-Imperium':'local'}}:{});const result=await response.json();
+  const response=await fetch(endpoint('/api/placements'),appRole==='admin'?{method:'POST',headers:{'X-War-Imperium':'local'}}:{});const result=await response.json();
   if(demo)return;
   if(!response.ok)throw Error(result.error||'Ranglistenabruf fehlgeschlagen.');
   placementGrid.replaceChildren();
@@ -55,7 +60,7 @@ async function loadPlacements(){
    const rank=document.createElement('strong');rank.textContent=board.error?'Nicht verfügbar':board.rank?`Platz ${board.rank.toLocaleString('de-DE')}`:'Nicht aufgeführt';
    const note=document.createElement('p');note.textContent=board.error|| (board.rank?`${board.score===null?'':board.score.toLocaleString('de-DE')+' Punkte'}${board.previousRank>0?' · Vorheriger API-Rang: '+board.previousRank.toLocaleString('de-DE'):''}`:`In ${board.checked.toLocaleString('de-DE')} abgerufenen Einträgen nicht enthalten.${board.complete?'':' Suche wegen Abrufgrenze unvollständig.'}`);
    card.append(title,rank);if(board.error)card.append(note);
-   if(board.title==='Clankrieg · Weltweit'||board.title==='Clankrieg · Germany'){
+   if(activeClan==='22QJG0'&&(board.title==='Clankrieg · Weltweit'||board.title==='Clankrieg · Germany')){
     const best=document.createElement('p');best.className='best-placement';
     best.textContent=board.title==='Clankrieg · Weltweit'?'Beste Platzierung Weltweit: Platz 144':'Beste Platzierung Germany: Platz 12';
     best.title='Historische Bestplatzierung, vom Nutzer angegeben';card.append(best);
@@ -70,7 +75,7 @@ placementButton.onclick=loadPlacements;
 const chartPanel=document.createElement('section');chartPanel.className='panel trend-panel';
 const chartTitle=document.createElement('h2');chartTitle.textContent='Clanpunkte · Die letzten 10 Kriegswochen';
 const chartHost=document.createElement('div');chartHost.className='trend-scroll';
-const chartRecord=document.createElement('p');chartRecord.className='chart-record';chartRecord.textContent='Wochenpunkte-Rekord: 140.300 Punkte';
+const chartRecord=document.createElement('p');chartRecord.className='chart-record';chartRecord.textContent='Wochenpunkte-Rekord: 140.300 Punkte';chartRecord.hidden=activeClan!=='22QJG0';
 chartPanel.append(chartTitle,chartRecord,chartHost);document.querySelector('aside').before(chartPanel);
 const clanPrintReport=document.createElement('div');clanPrintReport.id='clan-print-report';document.body.append(clanPrintReport);
 function printClanReport(){
@@ -90,7 +95,7 @@ function printClanReport(){
   copy.querySelectorAll('input,select,summary').forEach(el=>el.remove());
   const masthead=document.createElement('div');masthead.className='report-masthead';
   const crest=document.createElement('img');crest.src='/crest.svg';crest.alt='';crest.width=42;crest.height=52;
-  const brand=document.createElement('div'),kicker=document.createElement('p');kicker.className='report-kicker';kicker.textContent='WAR IMPERIUM · CLAN #22QJG0';
+  const brand=document.createElement('div'),kicker=document.createElement('p');kicker.className='report-kicker';kicker.textContent=clanName.toUpperCase()+' · CLAN #'+activeClan;
   const reportTitle=document.createElement('strong');reportTitle.textContent='Clankrieg Report';brand.append(kicker,reportTitle);
   const sectionNumber=document.createElement('span');sectionNumber.className='report-number';sectionNumber.textContent=String(index+1).padStart(2,'0');masthead.append(crest,brand,sectionNumber);copy.prepend(masthead);
   const meta=document.createElement('div');meta.className='report-metadata';
@@ -99,12 +104,12 @@ function printClanReport(){
   if(index===0){const legend=document.createElement('p');legend.className='report-score-legend';legend.textContent='Punktebewertung: bis 2.500 rot · ab 2.900 grün · auf 16 Angriffe normalisiert';meta.after(legend);}
   const footer=document.createElement('p');footer.className='report-section-footer';footer.textContent='WAR IMPERIUM  /  '+['Spielerpunkte','Clanpunkte','Fehlende Angriffe','Clanplatzierungen'][index]+'  ·  '+String(index+1).padStart(2,'0')+' / 04';copy.append(footer);clanPrintReport.append(copy);
  }
- const originalTitle=document.title;document.title='War Imperium Clanbericht';document.body.classList.add('print-clan-report');
+ const originalTitle=document.title;document.title=clanName+' Clanbericht';document.body.classList.add('print-clan-report');
  const restore=()=>{document.body.classList.remove('print-clan-report');document.title=originalTitle;clanPrintReport.replaceChildren();};window.addEventListener('afterprint',restore,{once:true});
  try{window.print();}catch(error){window.removeEventListener('afterprint',restore);restore();throw error;}
 }
 function renderTrend(){
- const points=weeklyTrend(weeks);chartHost.replaceChildren();
+ const points=weeklyTrend(weeks);chartHost.replaceChildren();if(activeClan!=='22QJG0'){chartRecord.hidden=!points.length;chartRecord.textContent='Höchste gespeicherte Wochenpunkte: '+Math.max(0,...weeks.map(w=>w.players.reduce((sum,p)=>sum+p.points,0))).toLocaleString('de-DE')+' Punkte';}
 
  chartTitle.textContent=`${demo?'DEMO · ':''}Clanpunkte · Die letzten ${Math.min(10,weeks.length)} Kriegswochen`;
  if(!points.length){chartHost.textContent='Nach dem ersten Abruf erscheint hier die Entwicklung der Clanpunkte.';return;}
@@ -145,7 +150,7 @@ const pdfButton=document.createElement('button');pdfButton.textContent='Als PDF 
 exportBar.append(pdfButton);document.querySelector('.filters').before(exportBar);
 const printSummary=document.createElement('p');printSummary.className='print-summary';exportBar.after(printSummary);
 function selectedRows(){return filterMembers(rankings(weeks,$('week').value,Number($('window').value)),roster?.members,memberToggle.checked);}
-function exportMetadata(){return [demo?'DEMO – Erfundenes Beispiel':'War Imperium · Clan #22QJG0',$('week').selectedOptions[0]?.textContent??'',`Auswertung: ${$('window').selectedOptions[0].textContent}`,`Filter: ${memberToggle.checked?'Nur aktuell im Clan':'Alle historischen Teilnehmer'}`,demo?'Demo-Mitgliederliste':roster?`Mitgliederstand: ${new Date(roster.updatedAt).toLocaleString('de-DE')}`:'Kein Mitgliederstand',`Export: ${new Date().toLocaleString('de-DE')}`];}
+function exportMetadata(){return [demo?'DEMO – Erfundenes Beispiel':clanName+' · Clan #'+activeClan,$('week').selectedOptions[0]?.textContent??'',`Auswertung: ${$('window').selectedOptions[0].textContent}`,`Filter: ${memberToggle.checked?'Nur aktuell im Clan':'Alle historischen Teilnehmer'}`,demo?'Demo-Mitgliederliste':roster?`Mitgliederstand: ${new Date(roster.updatedAt).toLocaleString('de-DE')}`:'Kein Mitgliederstand',`Export: ${new Date().toLocaleString('de-DE')}`];}
 pdfButton.onclick=printClanReport;
 const playerPointsPanel=document.querySelector('.panel');playerPointsPanel.classList.add('player-points-panel');
 playerPointsPanel.after(chartPanel,attendancePanel,placementPanel);
@@ -154,10 +159,10 @@ function render(){renderAttendance();
  pdfButton.disabled=appRole!=='admin'||(weeks.length===0&&!roster);pdfButton.hidden=appRole!=='admin';$('sync').hidden=appRole!=='admin';placementButton.hidden=appRole!=='admin';
  memberStatus.textContent=demo?'Demo-Mitgliederliste (Beispieldaten).':roster?`Mitgliederliste: ${roster.members.length} Mitglieder · Stand ${new Date(roster.updatedAt).toLocaleString('de-DE')}. Wird beim API-Abruf aktualisiert.`:'Noch keine Mitgliederliste vorhanden. Bitte API-Daten abrufen oder den Filter ausschalten.';
  $('empty').textContent=weeks.length?'Keine passenden Spieler mit gespeicherten Kriegsdaten für diese Auswahl.':'Noch keine gespeicherten Daten. Ein Admin kann die API-Daten abrufen.';
- rows.forEach((r,i)=>{const tr=document.createElement('tr');[i+1,`${r.name} (${r.tag})`,r.value===null?'—':r.value.toLocaleString('de-DE',{maximumFractionDigits:1}),`${r.count} / ${r.available}`].forEach((v,column)=>{const td=document.createElement('td');td.textContent=v;if(column===2)td.className=`score-${scoreBand(r.value)}`;tr.append(td)});$('rows').append(tr)});
+ rows.forEach((r,i)=>{const tr=document.createElement('tr');[i+1,`${r.name} (${r.tag})`,r.value===null?'—':r.value.toLocaleString('de-DE',{maximumFractionDigits:1}),`${r.count} / ${r.available}`].forEach((v,column)=>{const td=document.createElement('td');td.textContent=v;if(column===1){td.replaceChildren();const name=document.createElement('span'),tag=document.createElement('span');tag.className='player-tag';name.textContent=r.name+' ';tag.textContent='('+r.tag+')';td.append(name,tag);}if(column===2)td.className=`score-${scoreBand(r.value)}`;tr.append(td)});$('rows').append(tr)});
 }
-async function load(isDemo=false){const r=await fetch(isDemo?'/api/demo':'/api/history');const d=await r.json();weeks=d.weeks;demo=isDemo;appRole=d.role??'vice';document.body.dataset.role=appRole;roster=d.roster??null;if(!isDemo){savedAbsences=d.absences??{};}weeks.sort((a,b)=>b.season-a.season||b.section-a.section);$('week').replaceChildren(...weeks.map(w=>{const o=document.createElement('option');o.value=w.id;o.textContent=`${isDemo?'Demo · ':''}Saison ${w.season} · Woche ${w.section+1}`;return o}));$('status').textContent=isDemo?'DEMO · Erfundenes Beispiel, keine echten Clandaten.':`${weeks.length} gespeicherte Wochen. ${d.configured?'API-Schlüssel eingerichtet.':'API-Schlüssel fehlt noch.'}`;render();renderTrend();placementButton.disabled=demo;loadPlacements();return d;}
-async function sync(){if(appRole!=='admin')return; $('sync').disabled=true;try{const r=await fetch('/api/sync',{method:'POST',headers:{'X-War-Imperium':'local'}});const d=await r.json();if(!r.ok)throw Error(d.error);await load();$('status').textContent=`Abruf erfolgreich: ${d.imported} verfügbare Wochen geprüft, ${d.total} lokal gespeichert.`;}catch(e){$('status').textContent=e.message;}finally{$('sync').disabled=false;}}
+async function load(isDemo=false){const r=await fetch(isDemo?'/api/demo':endpoint('/api/history'));const d=await r.json();if(!r.ok)throw Error(d.error||'Daten konnten nicht geladen werden.');weeks=d.weeks;demo=isDemo;appRole=d.role??'vice';document.body.dataset.role=appRole;roster=d.roster??null;if(!isDemo){savedAbsences=d.absences??{};}weeks.sort((a,b)=>b.season-a.season||b.section-a.section);$('week').replaceChildren(...weeks.map(w=>{const o=document.createElement('option');o.value=w.id;o.textContent=`${isDemo?'Demo · ':''}Saison ${w.season} · Woche ${w.section+1}`;return o}));$('status').textContent=isDemo?'DEMO · Erfundenes Beispiel, keine echten Clandaten.':`${weeks.length} gespeicherte Wochen. ${d.configured?'API-Schlüssel eingerichtet.':'API-Schlüssel fehlt noch.'}`;render();renderTrend();placementButton.disabled=demo;loadPlacements();return d;}
+async function sync(){if(appRole!=='admin')return; $('sync').disabled=true;try{const r=await fetch(endpoint('/api/sync'),{method:'POST',headers:{'X-War-Imperium':'local'}});const d=await r.json();if(!r.ok)throw Error(d.error);await load();$('status').textContent=`Abruf erfolgreich: ${d.imported} verfügbare Wochen geprüft, ${d.total} lokal gespeichert.`;}catch(e){$('status').textContent=e.message;}finally{$('sync').disabled=false;}}
 $('sync').onclick=sync;$('week').onchange=render;$('window').onchange=render;
 function showError(){ $('status').textContent='Lokaler Server nicht erreichbar.'; }
 load().then(d=>{if(d.configured&&appRole==='admin')sync()}).catch(showError);setInterval(()=>{if(!demo&&appRole==='admin')sync()},3600000);

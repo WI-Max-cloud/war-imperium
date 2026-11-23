@@ -1,5 +1,5 @@
-export async function clanPlacements(api) {
- const clan=await api('clans/%2322QJG0');
+export async function clanPlacements(api,tag='22QJG0') {
+ const clan=await api('clans/%23'+tag);
  const location=clan.location;
  const boards=[['Clanpunkte · Weltweit','global','clans'],['Clankrieg · Weltweit','global','clanwars'],['Clanpunkte · '+(location?.name||'Clanregion'),location?.id,'clans'],['Clankrieg · '+(location?.name||'Clanregion'),location?.id,'clanwars']];
  const results=[];
@@ -11,7 +11,7 @@ export async function clanPlacements(api) {
     const response=await api(`locations/${encodeURIComponent(id)}/rankings/${type}?limit=1000`+(cursor?'&after='+encodeURIComponent(cursor):''));
     if(!Array.isArray(response.items))throw Error('API-Ranglistenformat ungültig');
     count+=response.items.length;
-    found=response.items.find(c=>c.tag==='#22QJG0');
+    found=response.items.find(c=>c.tag==='#'+tag);
     if(found){if(!Number.isInteger(found.rank)||found.rank<1)throw Error('API-Platzierung fehlt');break;}
     cursor=response.paging?.cursors?.after;
     if(!cursor){complete=true;break;}
