@@ -2,40 +2,26 @@ const $=id=>document.getElementById(id),clan=$('stats-clan'),player=$('stats-pla
 let requestId=0,controller;
 const number=n=>Number.isFinite(n)?n.toLocaleString('de-DE',{maximumFractionDigits:1}):'Nicht verfügbar';
 const el=(tag,text,className)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(className)n.className=className;return n;};
-const labels={collectionLevel:'Sammlungslevel',kingTowerLevel:'Königsturm-Level',currentWinLoseStreak:'Aktuelle Sieg-/Niederlagenserie',starPoints:'Sternpunkte',legacyTrophyRoadHighScore:'Frühere Trophäenstraße · Bestwert',trophies:'Aktuelle Pokale',bestTrophies:'Pokale · Bestwert',expLevel:'Erfahrungslevel',wins:'Siege',losses:'Niederlagen',battleCount:'Gespielte Kämpfe',threeCrownWins:'Drei-Kronen-Siege',challengeMaxWins:'Herausforderung · Beste Siege',challengeCardsWon:'Herausforderung · Gewonnene Karten',tournamentCardsWon:'Turnier · Gewonnene Karten',tournamentBattleCount:'Turnierkämpfe',totalDonations:'Spenden insgesamt',donations:'Aktuelle Spenden',donationsReceived:'Spenden erhalten',warDayWins:'Kriegstag-Siege (API)',clanCardsCollected:'Gesammelte Clankarten (API)',arena:'Arena',leagueStatistics:'Liga-Statistiken',currentSeason:'Aktuelle Saison',previousSeason:'Vorherige Saison',bestSeason:'Beste Saison',currentPathOfLegendSeasonResult:'Pfad der Legenden · Aktuelle Saison',lastPathOfLegendSeasonResult:'Pfad der Legenden · Letzte Saison',bestPathOfLegendSeasonResult:'Pfad der Legenden · Bestwert',leagueNumber:'Liga',rank:'Rang',bestRank:'Bester Rang',bestTrophies:'Pokale · Bestwert',name:'Name',id:'ID',seasonId:'Saison',progress:'Fortschritt',target:'Ziel',value:'Wert',level:'Level',stars:'Sterne'};
-function section(title){const s=el('section',undefined,'panel stats-section');s.append(el('h2',title));result.append(s);return s;}
-function facts(host,entries){const dl=el('dl',undefined,'stats-facts');for(const [label,value] of entries){const box=el('div');box.append(el('dt',label),el('dd',value));dl.append(box);}host.append(dl);}
-function cards(host,items){
- if(!items.length){host.append(el('p','Nicht über die API verfügbar.'));return;}
- const list=el('ul',undefined,'stats-card-list');for(const c of items){const li=el('li');li.append(el('strong',c.name),el('span',c.level===null?'Level nicht verfügbar':'Level '+c.level));if(Number.isFinite(c.elixirCost))li.append(el('small',c.elixirCost+' Elixier'));list.append(li);}host.append(list);
-}
+function section(title,cls=''){const s=el('section',undefined,'pass-panel '+cls);s.append(el('h2',title));return s;}
+function fact(host,label,value){const row=el('div',undefined,'pass-fact');row.append(el('span',label),el('strong',value));host.append(row);}
 function render(d){
- result.replaceChildren();
- const profile=section(d.name);profile.append(el('p',`${d.tag} · ${d.clan?.name??'Kein Clan'} ${d.clan?.tag??''}`));
- const age=d.accountAge;
- const ageText=age?[[age.years,'Jahr','Jahre'],[age.weeks,'Woche','Wochen'],[age.days,'Tag','Tage']].map(([value,singular,plural])=>`${value} ${value===1?singular:plural}`).join(', '):'Nicht über die API verfügbar';
- const createdOn=age?.estimatedCreatedOn?age.estimatedCreatedOn.split('-').reverse().join('.'):null;
- facts(profile,[['Account-Gründungsdatum',createdOn?`ca. ${createdOn} (berechnet)`:'Nicht über die API verfügbar'],['Account-Alter',ageText],['Rolle im Clan',({member:'Mitglied',elder:'Ältester',coLeader:'Vize-Anführer',leader:'Anführer'})[d.role]??d.role??'Nicht verfügbar'],['Datenstand',new Date(d.updatedAt).toLocaleString('de-DE')]]);
- if(age)profile.append(el('p',`${number(age.totalDays)} Tage laut Alters-Abzeichen · Jahre mit 365 Tagen, Rest in Wochen und Tagen. Das Gründungsdatum ist zurückgerechnet; einen exakten Erstellungszeitpunkt liefert die API nicht.`));
- const collection=section('Kartenstatistiken');facts(collection,[['Karten auf Level 16',d.cards.count16===null?`${number(d.cards.knownCount16)} sicher bekannt`:number(d.cards.count16)],['Anteil aller Karten auf Level 16',d.cards.percent16===null?'Nicht verfügbar':number(d.cards.percent16)+' %'],['Freigeschaltete Karten',number(d.cards.owned)],['Karten im API-Katalog',number(d.cards.total)]]);
- collection.append(el('p','Der Anteil bezieht sich auf alle Karten im aktuellen Kartenkatalog, einschließlich noch nicht freigeschalteter Karten. Turmtruppen werden separat aufgeführt.'));
- if(d.cards.unknown)collection.append(el('p',`${d.cards.unknown} Karten ohne auswertbares Level. Eine vollständige Level-16-Quote ist deshalb nicht verfügbar.`));
- const bars=el('div',undefined,'stats-levels');for(const [level,count] of Object.entries(d.cards.distribution).sort((a,b)=>Number(b[0])-Number(a[0]))){const row=el('div'),progress=el('progress');progress.max=d.cards.owned||1;progress.value=count;progress.setAttribute('aria-label',`${level==='unknown'?'Unbekannt':'Level '+level}: ${count} Karten`);row.append(el('span',level==='unknown'?'Unbekannt':'Level '+level),progress,el('strong',number(count)));bars.append(row);}collection.append(bars);
- const full=el('details'),summary=el('summary','Alle freigeschalteten Karten anzeigen');full.append(summary);cards(full,[...d.cards.items].sort((a,b)=>(b.level??0)-(a.level??0)||a.name.localeCompare(b.name,'de')));collection.append(full);
- const stats=section('Pokale & Spielstatistiken');facts(stats,Object.entries(d.metrics).map(([key,value])=>[labels[key]??key,number(value)]));
- if(!Object.keys(d.metrics).length)stats.append(el('p','Nicht über die API verfügbar.'));
- const modes=section('Spielmodi & Bestwerte');
- for(const [key,value] of Object.entries(d.progress)){
-  modes.append(el('h3',labels[key]??key));const entries=[];
-  function flatten(obj,prefix='',depth=0){if(depth>4||entries.length>=100)return;for(const [k,v] of Object.entries(obj)){if(/icon|url/i.test(k)||v===null||v===undefined)continue;const name=(prefix?prefix+' · ':'')+(labels[k]??k);if(typeof v==='object')flatten(v,name,depth+1);else if(typeof v==='number'||typeof v==='string'&&!v.startsWith('http'))entries.push([name,typeof v==='number'?number(v):v]);}}
-  flatten(value);facts(modes,entries);
- }
- if(!Object.keys(d.progress).length)modes.append(el('p','Weitere Spielmodi und Ranglistenwerte sind für diesen Spieler nicht über die API verfügbar.'));
- modes.append(el('p','Angezeigt werden die vom Spielerprofil gelieferten Werte. Nicht jeder Modus liefert eine Platzierung oder einen Pokalstand.'));
- const deck=section('Aktuelles Deck');cards(deck,d.currentDeck);if(d.currentSupportCards.length){deck.append(el('h3','Turmtruppe im Deck'));cards(deck,d.currentSupportCards);}deck.append(el('p','Die API liefert das aktuell ausgewählte Deck, keine vollständige Liste aller gespeicherten Decks.'));
- if(d.supportCards.length){const support=section('Turmtruppen');cards(support,d.supportCards);}
- if(d.favoriteCard){const favorite=section('Lieblingskarte');cards(favorite,[d.favoriteCard]);}
- if(d.badges.length||d.achievements.length){const honors=section('Abzeichen & Erfolge');for(const [heading,items] of [['Abzeichen',d.badges],['Erfolge',d.achievements]]){if(!items.length)continue;const details=el('details');details.append(el('summary',heading+' ('+items.length+')'));const list=el('ul');for(const item of items){const li=el('li');li.append(el('strong',item.name),el('span',' · '+Object.entries(item).filter(([k,v])=>k!=='name'&&Number.isFinite(v)).map(([k,v])=>(labels[k]??k)+': '+number(v)).join(' · ')));list.append(li);}details.append(list);honors.append(details);}}
+ result.replaceChildren();result.className='imperium-pass';
+ const hero=el('section',undefined,'pass-hero'),crest=el('img');crest.src='/crest.svg';crest.alt='War Imperium Wappen';
+ hero.append(el('p','Imperium Spielerpass','pass-ribbon'),crest,el('h2',d.name),el('p',d.tag+' · '+(d.clan?.name??'Kein Clan'),'pass-identity'));
+ const a=d.accountAge,age=a?[[a.years,'Jahr','Jahre'],[a.weeks,'Woche','Wochen'],[a.days,'Tag','Tage']].map(([n,s,p])=>n+' '+(n===1?s:p)).join(' · '):'Nicht verfügbar';
+ const ageBox=el('div',undefined,'pass-age');ageBox.append(el('span','Account-Alter'),el('strong',age));hero.append(ageBox);result.append(hero);
+ const kpis=el('div',undefined,'pass-kpis');
+ const ranked=d.rankedBest??{name:'Nicht verfügbar',rank:null};const best=ranked.rank?'Platz '+number(ranked.rank):ranked.name;
+ for(const [icon,title,value] of [['🏆','Pokale',number(d.metrics.trophies)],['♛','Ranked-Bestwert',best],['▣','Level-16-Karten',d.cards.count16===null?'Nicht verfügbar':number(d.cards.count16)+' / '+number(d.cards.total)]]){const box=el('article',undefined,'pass-kpi');box.append(el('span',icon,'pass-kpi-icon'),el('h3',title),el('strong',value));if(title==='Ranked-Bestwert'&&ranked.rank)box.append(el('small',ranked.name));kpis.append(box);}result.append(kpis);
+ const middle=el('div',undefined,'pass-middle'),deck=section('Aktuelles Deck','pass-deck');
+ if(d.currentDeck.length){const grid=el('ul',undefined,'pass-deck-grid');for(const c of d.currentDeck){const li=el('li');if(c.image){const img=el('img');img.src=c.image;img.alt=c.name;img.loading='lazy';li.append(img);}else li.append(el('span',c.name,'pass-card-fallback'));li.append(el('strong',c.level===null?'Level —':'Level '+c.level));li.title=c.name;grid.append(li);}deck.append(grid);if(d.lastBattle){let date=d.lastBattle.time;const m=/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})/.exec(date);if(m){const parsed=new Date(m[1]+'-'+m[2]+'-'+m[3]+'T'+m[4]+':'+m[5]+':'+m[6]+'Z');date=parsed.toLocaleString('de-DE');}deck.append(el('p','Zuletzt gespielt · '+d.lastBattle.mode+' · '+date,'pass-note'));}}
+ else deck.append(el('p','Das zuletzt gespielte Deck ist im Kampfprotokoll nicht verfügbar.'));
+ const collection=section('Kartensammlung','pass-collection'),ring=el('div',undefined,'pass-ring');
+ const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 120 120');svg.setAttribute('aria-hidden','true');for(const [cls,dash] of [['ring-track',null],['ring-fill',d.cards.percent16===null?'0 100':d.cards.percent16+' 100']]){const c=document.createElementNS(svg.namespaceURI,'circle');for(const [k,v] of Object.entries({cx:60,cy:60,r:50,pathLength:100,class:cls}))c.setAttribute(k,v);if(dash)c.setAttribute('stroke-dasharray',dash);svg.append(c);}const percent=el('div');percent.append(el('strong',d.cards.percent16===null?'—':number(d.cards.percent16)+' %'),el('span','Level 16'));ring.append(svg,percent);collection.append(ring);
+ const legend=el('div',undefined,'pass-levels');for(const [level,count] of Object.entries(d.cards.distribution).sort((a,b)=>Number(b[0])-Number(a[0])))fact(legend,level==='unknown'?'Level unbekannt':'Level '+level,number(count));fact(legend,'Gesammelt',number(d.cards.owned));if(d.cards.total!==null)fact(legend,'Karten insgesamt',number(d.cards.total));collection.append(legend);middle.append(deck,collection);result.append(middle);
+ const bottom=el('div',undefined,'pass-bottom'),battles=section('⚔ Kämpfe'),donations=section('♟ Spenden'),war=section('♛ Clankrieg 2');
+ fact(battles,'Siege',number(d.metrics.wins));fact(battles,'Niederlagen',number(d.metrics.losses));const decided=(d.metrics.wins??0)+(d.metrics.losses??0);fact(battles,'Siegesquote',Number.isFinite(d.metrics.wins)&&Number.isFinite(d.metrics.losses)&&decided?number(d.metrics.wins/decided*100)+' %':'Nicht verfügbar');
+ fact(donations,'Gespendet insgesamt',number(d.metrics.totalDonations));fact(donations,'Aktuell erhalten',number(d.metrics.donationsReceived));fact(war,'Siege',number(d.clanWar2Wins));bottom.append(battles,donations,war);result.append(bottom);
 }
 async function get(path,id){const response=await fetch(path,{signal:controller.signal}),data=await response.json();if(id!==requestId)return null;if(!response.ok)throw Error(data.error||'API-Abruf fehlgeschlagen.');return data;}
 async function loadMembers(){

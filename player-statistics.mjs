@@ -15,16 +15,30 @@ export function accountAgeFromBadges(badges,now=new Date()){
  const estimatedCreatedOn=new Date(Date.parse(asOf+'T00:00:00Z')-totalDays*86400000).toISOString().slice(0,10);
  return {totalDays,years:Math.floor(totalDays/365),weeks:Math.floor(totalDays%365/7),days:totalDays%365%7,estimatedCreatedOn,asOf,source:'YearsPlayed'};
 }
+export function rankedBest(p){
+ const seasons=[p.bestPathOfLegendSeasonResult,p.lastPathOfLegendSeasonResult].filter(Boolean);
+ const league=Math.max(0,...seasons.map(s=>Number.isInteger(s.leagueNumber)?s.leagueNumber:0));
+ const ranks=seasons.map(s=>s.rank).filter(r=>Number.isInteger(r)&&r>0&&r<=10000);
+ const names=['Nicht verfügbar','Herausforderer I','Herausforderer II','Herausforderer III','Meister I','Meister II','Meister III','Champion','Großer Champion','Königlicher Champion','Ultimativer Champion'];
+ return {leagueNumber:league,name:names[league]??('Liga '+league),rank:ranks.length?Math.min(...ranks):null};
+}
+export function latestBattle(log,tag){
+ if(!Array.isArray(log))return null;
+ const b=[...log].filter(b=>typeof b.battleTime==='string'&&b.team?.some(t=>t.tag===tag)).sort((a,b)=>b.battleTime.localeCompare(a.battleTime))[0];
+ if(!b)return null;return {team:b.team.find(t=>t.tag===tag),time:b.battleTime,mode:b.gameMode?.name??b.type??'Unbekannter Modus'};
+}
+function cardIcon(c){const value=c.iconUrls?.medium??c.iconUrls?.large;try{const u=new URL(value);return u.protocol==='https:'&&u.hostname==='api-assets.clashroyale.com'?u.href:null;}catch{return null;}}
 export function summarizePlayer(p,catalog=null,now=new Date()){
  const items=Array.isArray(catalog?.items)?catalog.items:[];
- const card=c=>({id:c.id,name:c.name??'Karte',level:cardLevel(c,items),rarity:c.rarity??items.find(i=>i.id===c.id)?.rarity??null,evolutionLevel:c.evolutionLevel??null,starLevel:c.starLevel??null,elixirCost:c.elixirCost??null});
+ const card=c=>({image:cardIcon(c),id:c.id,name:c.name??'Karte',level:cardLevel(c,items),rarity:c.rarity??items.find(i=>i.id===c.id)?.rarity??null,evolutionLevel:c.evolutionLevel??null,starLevel:c.starLevel??null,elixirCost:c.elixirCost??null});
  const cards=[...new Map((p.cards??[]).map(c=>[c.id,card(c)])).values()];
  const normalIds=new Set(items.map(c=>c.id)),count16=cards.filter(c=>c.level===16&&(!items.length||normalIds.has(c.id))).length;
  const unknown=cards.filter(c=>c.level===null).length,distribution={};
  for(const c of cards)distribution[c.level??'unknown']=(distribution[c.level??'unknown']??0)+1;
  const metrics={};for(const key of ['collectionLevel','kingTowerLevel','currentWinLoseStreak','starPoints','legacyTrophyRoadHighScore','trophies','bestTrophies','expLevel','wins','losses','battleCount','threeCrownWins','challengeMaxWins','challengeCardsWon','tournamentCardsWon','tournamentBattleCount','totalDonations','donations','donationsReceived','warDayWins','clanCardsCollected'])if(Number.isFinite(p[key]))metrics[key]=p[key];
  const progress={};for(const key of ['arena','leagueStatistics','currentPathOfLegendSeasonResult','lastPathOfLegendSeasonResult','bestPathOfLegendSeasonResult','progress'])if(p[key]&&typeof p[key]==='object')progress[key]=p[key];
- return {name:p.name,tag:p.tag,clan:p.clan?{name:p.clan.name,tag:p.clan.tag}:null,role:p.role??null,metrics,progress,
+ const warWins=p.badges?.find(b=>b.name==='ClanWarWins')?.progress;
+ return {rankedBest:rankedBest(p),clanWar2Wins:Number.isInteger(warWins)&&warWins>=0?warWins:null,name:p.name,tag:p.tag,clan:p.clan?{name:p.clan.name,tag:p.clan.tag}:null,role:p.role??null,metrics,progress,
   cards:{items:cards,count16:unknown?null:count16,knownCount16:count16,total:items.length||null,owned:cards.length,unknown,percent16:items.length&&!unknown?count16/items.length*100:null,distribution},
   currentDeck:(p.currentDeck??[]).map(card),supportCards:(p.supportCards??[]).map(card),currentSupportCards:(p.currentDeckSupportCards??[]).map(card),favoriteCard:p.currentFavouriteCard?card(p.currentFavouriteCard):null,
   badges:(p.badges??[]).map(b=>({name:b.name,level:b.level,progress:b.progress,target:b.target})),achievements:(p.achievements??[]).map(a=>({name:a.name,value:a.value,target:a.target,stars:a.stars})),
@@ -59,7 +73,11 @@ export function playerStatistics(storage,api,configured=()=>true){
    if(p.tag!==playerTag||typeof p.name!=='string')throw fail(502,'API-Spielerprofil ungültig.');
    if(p.clan?.tag!=='#'+tag){cache.delete('members-'+tag);throw fail(409,'Der Spieler hat inzwischen den Clan gewechselt. Bitte die Mitgliederliste aktualisieren.');}
    let catalog;try{catalog=await cached('catalog',3600000,()=>api('cards'));}catch{catalog=null;}
-   return summarizePlayer(p,catalog);
+   const summary=summarizePlayer(p,catalog);
+   let battle=null;try{battle=latestBattle(await api('players/'+encodeURIComponent(playerTag)+'/battlelog'),playerTag);}catch{}
+   summary.currentDeck=battle?summarizePlayer({...p,currentDeck:battle.team.cards??[]},catalog).currentDeck:[];
+   summary.lastBattle=battle?{time:battle.time,mode:battle.mode}:null;
+   return summary;
   });
  }
  return {members,player};
