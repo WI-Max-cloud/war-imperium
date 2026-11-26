@@ -1,3 +1,4 @@
+import {currentRace} from './current-race.mjs';
 import {warClan,clanStorage} from './war-clans.mjs';
 import {playerStatistics} from './player-statistics.mjs';
 import {defaultTournaments,updateTournaments,tournamentStorage} from './tournaments.mjs';
@@ -21,6 +22,7 @@ const storage=createStorage({directory:data});
 if(process.env.RENDER==='true'&&(!process.env.APP_PASSWORD||process.env.APP_PASSWORD.length<16))throw Error('Für Render ein APP_PASSWORD mit mindestens 16 Zeichen setzen.');
 const handleContent=contentHandler(storage);
 const getFamilyStats=familyStats(storage,api,()=>!!process.env.CLASH_API_KEY);
+const getCurrentRace=currentRace(path=>api(path,true),()=>!!process.env.CLASH_API_KEY);
 const getPlayerStatistics=playerStatistics(storage,path=>api(path,true),()=>!!process.env.CLASH_API_KEY);
 const warBusy=new Set(),warPlacementCache=new Map(),warPlacementRequests=new Map();
 let attendanceBusy=false;
@@ -45,7 +47,7 @@ export const server=http.createServer(async(req,res)=>{
  const send=(status,value)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify(value));};
  try{
  const requestUrl=new URL(req.url,'http://localhost');
- const warPath=['/clankrieg','/clankrieg/','/api/history','/api/sync','/api/placements','/api/absence'].includes(requestUrl.pathname);
+ const warPath=['/clankrieg','/clankrieg/','/api/current-race','/api/history','/api/sync','/api/placements','/api/absence'].includes(requestUrl.pathname);
  const clanTag=warPath?(requestUrl.searchParams.get('clan')||'22QJG0'):'22QJG0';
  if(warPath){if(!warClan(clanTag))return send(400,{error:'Ungültige Clanauswahl'});req.url=requestUrl.pathname;}
  const warStorage=clanStorage(storage,clanTag);
@@ -80,6 +82,7 @@ export const server=http.createServer(async(req,res)=>{
   if(!['/clankrieg','/clankrieg/'].includes(req.url))return send(404,{error:'Nicht gefunden'});
   res.writeHead(302,{'Location':'/#admin-login','Cache-Control':'no-store'});res.end();return;
  }
+ if(req.method==='GET'&&req.url==='/api/current-race')return send(200,await getCurrentRace(clanTag));
  if(req.url==='/api/tournaments'&&req.method==='GET')return send(200,{role,...await storage.read('tournaments',defaultTournaments())});
  if(req.url==='/api/tournaments'&&req.method==='POST'){
   if(!sameOrigin(req)||req.headers['x-war-imperium']!=='local')return send(403,{error:'Anfrage nicht erlaubt'});
@@ -225,7 +228,7 @@ export const server=http.createServer(async(req,res)=>{
    return send(200,{imported:incoming.length,total:merged.size});
   }finally{warBusy.delete(clanTag);}
  }
- const files={'/spielerstatistiken':'spielerstatistiken.html','/spielerstatistiken.html':'spielerstatistiken.html','/player-stats-ui.mjs':'player-stats-ui.mjs','/tournament-config.mjs':'tournament-config.mjs','/finals-builder.mjs':'finals-builder.mjs','/turniere':'turniere.html','/turniere.html':'turniere.html','/tournaments-ui.mjs':'tournaments-ui.mjs','/tournament-context.mjs':'tournament-context.mjs','/menu-login.mjs':'menu-login.mjs','/navigation-update.css':'navigation-update.css','/content-ui.mjs':'content-ui.mjs','/content.css':'content.css','/membership.mjs':'membership.mjs','/news':'news.html','/news.html':'news.html','/clans':'clans.html','/clans.html':'clans.html','/clan':'clans.html','/clan.html':'clans.html','/galerie':'galerie.html','/galerie.html':'galerie.html','/admin-auth.mjs':'admin-auth.mjs','/':'home.html','/index.html':'home.html','/home.css':'home.css','/home.mjs':'home.mjs','/clan-portraits.png':'clan-portraits.png','/home-hero.png':'home-hero.png','/crest.svg':'crest.svg','/clankrieg':'index.html','/clankrieg/':'index.html','/site-auth.mjs':'site-auth.mjs','/site-auth.css':'site-auth.css','/liga':'liga.html','/finals':'finals.html','/finals.html':'finals.html','/finals.mjs':'finals.mjs','/liga.html':'liga.html','/liga.mjs':'liga.mjs','/liga.css':'liga.css','/league-core.mjs':'league-core.mjs','/finals-core.mjs':'finals-core.mjs','/app.mjs':'app.mjs','/core.mjs':'core.mjs','/membership.mjs':'membership.mjs','/export.mjs':'export.mjs','/responsive.mjs':'responsive.mjs','/style.css':'style.css'};
+ const files={'/current-race-ui.mjs':'current-race-ui.mjs','/spielerstatistiken':'spielerstatistiken.html','/spielerstatistiken.html':'spielerstatistiken.html','/player-stats-ui.mjs':'player-stats-ui.mjs','/tournament-config.mjs':'tournament-config.mjs','/finals-builder.mjs':'finals-builder.mjs','/turniere':'turniere.html','/turniere.html':'turniere.html','/tournaments-ui.mjs':'tournaments-ui.mjs','/tournament-context.mjs':'tournament-context.mjs','/menu-login.mjs':'menu-login.mjs','/navigation-update.css':'navigation-update.css','/content-ui.mjs':'content-ui.mjs','/content.css':'content.css','/membership.mjs':'membership.mjs','/news':'news.html','/news.html':'news.html','/clans':'clans.html','/clans.html':'clans.html','/clan':'clans.html','/clan.html':'clans.html','/galerie':'galerie.html','/galerie.html':'galerie.html','/admin-auth.mjs':'admin-auth.mjs','/':'home.html','/index.html':'home.html','/home.css':'home.css','/home.mjs':'home.mjs','/clan-portraits.png':'clan-portraits.png','/home-hero.png':'home-hero.png','/crest.svg':'crest.svg','/clankrieg':'index.html','/clankrieg/':'index.html','/site-auth.mjs':'site-auth.mjs','/site-auth.css':'site-auth.css','/liga':'liga.html','/finals':'finals.html','/finals.html':'finals.html','/finals.mjs':'finals.mjs','/liga.html':'liga.html','/liga.mjs':'liga.mjs','/liga.css':'liga.css','/league-core.mjs':'league-core.mjs','/finals-core.mjs':'finals-core.mjs','/app.mjs':'app.mjs','/core.mjs':'core.mjs','/membership.mjs':'membership.mjs','/export.mjs':'export.mjs','/responsive.mjs':'responsive.mjs','/style.css':'style.css'};
  if(req.method!=='GET'||!files[req.url])return send(404,{error:'Nicht gefunden'});
  res.writeHead(200,{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Type':req.url.endsWith('.png')?'image/png':req.url.endsWith('.svg')?'image/svg+xml':req.url.endsWith('.mjs')?'text/javascript':req.url.endsWith('.css')?'text/css':'text/html; charset=utf-8','Content-Security-Policy':"default-src 'self'; img-src 'self' blob: https://api-assets.clashroyale.com; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"});
  res.end(await readFile(new URL(files[req.url],root)));
