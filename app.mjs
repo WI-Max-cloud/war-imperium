@@ -1,3 +1,4 @@
+import {mountCurrentRace} from './current-race-ui.mjs';
 import {rankings,filterMembers,weeklyTrend,attendanceWeeks,missingAttacks} from './core.mjs';
 import {scoreBand} from './export.mjs';
 const $=id=>document.getElementById(id);let weeks=[],demo=false,roster=null,appRole='vice';
@@ -6,6 +7,7 @@ const clanName=activeClan==='22QJG0'?'War Imperium':'War Imperium II';
 const endpoint=path=>path+'?clan='+encodeURIComponent(activeClan);
 const clanSelect=$('war-clan');clanSelect.value=activeClan;clanSelect.onchange=()=>location.assign('/clankrieg?clan='+encodeURIComponent(clanSelect.value));
 $('war-clan-name').textContent=clanName;
+mountCurrentRace(activeClan);
 let savedAbsences={},demoAbsences={};
 const attendancePanel=document.createElement('section');attendancePanel.className='panel attendance-panel';
 const attendanceTitle=document.createElement('h2');attendanceTitle.textContent='Fehlende Angriffe · Abmeldungen';
@@ -13,7 +15,7 @@ const attendanceLabel=document.createElement('label');attendanceLabel.textConten
 const attendanceSelect=document.createElement('select');attendanceLabel.append(attendanceSelect);
 const attendanceStatus=document.createElement('p');attendanceStatus.setAttribute('role','status');
 const attendanceTable=document.createElement('div');attendanceTable.className='table';
-attendancePanel.append(attendanceTitle,attendanceLabel,attendanceStatus,attendanceTable);document.querySelector('.panel').after(attendancePanel);
+attendancePanel.append(attendanceTitle,attendanceLabel,attendanceStatus,attendanceTable);document.querySelector('.panel:not(.live-race-panel)').after(attendancePanel);
 attendanceSelect.onchange=renderAttendance;
 function renderAttendance(){
  const eligible=attendanceWeeks(weeks),previous=attendanceSelect.value;
@@ -152,7 +154,7 @@ const printSummary=document.createElement('p');printSummary.className='print-sum
 function selectedRows(){return filterMembers(rankings(weeks,$('week').value,Number($('window').value)),roster?.members,memberToggle.checked);}
 function exportMetadata(){return [demo?'DEMO – Erfundenes Beispiel':clanName+' · Clan #'+activeClan,$('week').selectedOptions[0]?.textContent??'',`Auswertung: ${$('window').selectedOptions[0].textContent}`,`Filter: ${memberToggle.checked?'Nur aktuell im Clan':'Alle historischen Teilnehmer'}`,demo?'Demo-Mitgliederliste':roster?`Mitgliederstand: ${new Date(roster.updatedAt).toLocaleString('de-DE')}`:'Kein Mitgliederstand',`Export: ${new Date().toLocaleString('de-DE')}`];}
 pdfButton.onclick=printClanReport;
-const playerPointsPanel=document.querySelector('.panel');playerPointsPanel.classList.add('player-points-panel');
+const playerPointsPanel=document.querySelector('.panel:not(.live-race-panel)');playerPointsPanel.classList.add('player-points-panel');
 playerPointsPanel.after(chartPanel,attendancePanel,placementPanel);
 function render(){renderAttendance();
  const rows=filterMembers(rankings(weeks,$('week').value,Number($('window').value)),roster?.members,memberToggle.checked);$('rows').replaceChildren();$('empty').hidden=rows.length>0;
