@@ -1,4 +1,5 @@
 import {familyTags} from './family-stats.mjs';
+import {crownGames} from './crown-games.mjs';
 const fail=(status,message)=>Object.assign(Error(message),{status});
 export const crownLeagues=[1333092601,1282759744,1299537363,1383425458,1400203077].map((id,index)=>({id,index,name:"King’s League "+['I','II','III','IV','V'][index]}));
 export const boardUrl=id=>'https://www.royaletools.com/leaderboards?view=live&board='+encodeURIComponent('event:784088:league:'+id);
@@ -38,7 +39,8 @@ async function fetchPage(url){
  let bytes=0;const chunks=[];for await(const chunk of response.body){bytes+=chunk.length;if(bytes>3000000)throw Error('Ranglistendaten zu groß');chunks.push(chunk);}
  return Buffer.concat(chunks).toString('utf8');
 }
-export function crownRankings(storage,members,{loadPage=fetchPage,now=()=>Date.now()}={}){
+export function crownRankings(storage,members,{loadPage=fetchPage,now=()=>Date.now(),battleLog=null}={}){
+ const games=crownGames(battleLog,now);
  let pending,cached,attemptedAt=-Infinity;
  async function boards(){
   if(pending)return pending;if(cached&&now()-attemptedAt<600000)return cached;
@@ -63,6 +65,8 @@ export function crownRankings(storage,members,{loadPage=fetchPage,now=()=>Date.n
   const current=new Map(roster.members.map(p=>[p.tag,p]));
   const rows=rankings.flatMap(b=>b.entries.filter(p=>current.has(p.tag)).map(p=>({tag:p.tag,name:current.get(p.tag).name,rank:p.rank,league:b.name,leagueIndex:b.index,stale:b.error})));
   rows.sort((a,b)=>b.leagueIndex-a.leagueIndex||a.rank-b.rank||a.name.localeCompare(b.name,'de'));
+  let cursor=0;async function worker(){while(cursor<rows.length){const row=rows[cursor++];row.games=await games(row.tag,rankings[row.leagueIndex].fetchedAt);}}
+  await Promise.all([worker(),worker(),worker()]);
   return {clan:tag,membersUpdatedAt:roster.updatedAt,rows,boards:rankings.map(b=>({id:b.id,name:b.name,url:boardUrl(b.id),fetchedAt:b.fetchedAt,error:b.error,count:b.entries.length})),source:'RoyaleTools',limit:1000};
  };
 }

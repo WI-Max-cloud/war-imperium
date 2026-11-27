@@ -25,7 +25,7 @@ const handleContent=contentHandler(storage);
 const getFamilyStats=familyStats(storage,api,()=>!!process.env.CLASH_API_KEY);
 const getCurrentRace=currentRace(path=>api(path,true),()=>!!process.env.CLASH_API_KEY);
 const getPlayerStatistics=playerStatistics(storage,path=>api(path,true),()=>!!process.env.CLASH_API_KEY);
-const getCrownRankings=crownRankings(storage,getPlayerStatistics.members);
+const getCrownRankings=crownRankings(storage,getPlayerStatistics.members,{battleLog:tag=>api('players/'+encodeURIComponent(tag)+'/battlelog',true)});
 const warBusy=new Set(),warPlacementCache=new Map(),warPlacementRequests=new Map();
 let attendanceBusy=false;
 let tournamentCatalogBusy=false;

@@ -8,9 +8,9 @@ async function load(){
  try{
   const response=await fetch('/api/crown-rankings?clan='+encodeURIComponent(tag));const data=await response.json();if(!response.ok)throw Error(data.error||'Abruf fehlgeschlagen.');
   body.replaceChildren();sources.replaceChildren();
-  for(const p of data.rows){const row=el('tr'),player=el('td'),name=el('strong',p.name),identifier=el('small',p.tag);player.append(name,identifier);row.append(player,el('td',p.rank.toLocaleString('de-DE')),el('td',p.league+(p.stale?' · letzter Stand':'')));body.append(row);}
+  for(const p of data.rows){const row=el('tr'),player=el('td'),name=el('strong',p.name),identifier=el('small',p.tag);player.append(name,identifier);row.append(player,el('td',p.rank.toLocaleString('de-DE')),el('td',p.league+(p.stale?' · letzter Stand':'')));const games=el('td',p.games?(p.games.exact?'':'≥ ')+p.games.played+'/'+p.games.total:'—');games.title=p.games?(p.games.exact?'Gezählte Duelle':'Mindestens diese Anzahl; ältere Duelle fehlen möglicherweise')+' · Stand: '+date(p.games.updatedAt):'Kampfprotokoll nicht verfügbar';row.append(games);body.append(row);}
   const errors=data.boards.filter(b=>b.error).length;
-  if(!data.rows.length){const cell=el('td',errors?'Die Prüfung ist unvollständig. In den verfügbaren Daten wurden keine aktuellen Mitglieder gefunden.':'Keine aktuellen Mitglieder in den verfügbaren Top 1.000 dieser fünf Ligen gefunden.');cell.colSpan=3;body.append(el('tr'));body.lastChild.append(cell);}
+  if(!data.rows.length){const cell=el('td',errors?'Die Prüfung ist unvollständig. In den verfügbaren Daten wurden keine aktuellen Mitglieder gefunden.':'Keine aktuellen Mitglieder in den verfügbaren Top 1.000 dieser fünf Ligen gefunden.');cell.colSpan=4;body.append(el('tr'));body.lastChild.append(cell);}
   const count=new Set(data.rows.map(p=>p.tag)).size;
   status.textContent=`${count} Clanmitglied${count===1?'':'er'} gefunden · ${5-errors}/5 Ranglisten erfolgreich geprüft${errors?' · Einige Daten fehlen oder stammen aus dem letzten erfolgreichen Abruf.':''}`;
   for(const b of data.boards){const item=el('li'),link=el('a',b.name);link.href=b.url;link.target='_blank';link.rel='noopener noreferrer';item.append(link,el('span',(b.error?'Abruf derzeit nicht verfügbar · ':'')+date(b.fetchedAt)));sources.append(item);}
