@@ -1,3 +1,4 @@
+import {rankedMembers} from './ranked-members.mjs';
 import {crownRankings} from './crown-rankings.mjs';
 import {currentRace} from './current-race.mjs';
 import {warClan,clanStorage} from './war-clans.mjs';
@@ -25,6 +26,7 @@ const handleContent=contentHandler(storage);
 const getFamilyStats=familyStats(storage,api,()=>!!process.env.CLASH_API_KEY);
 const getCurrentRace=currentRace(path=>api(path,true),()=>!!process.env.CLASH_API_KEY);
 const getPlayerStatistics=playerStatistics(storage,path=>api(path,true),()=>!!process.env.CLASH_API_KEY);
+const getRankedMembers=rankedMembers(storage,path=>api(path,true),getPlayerStatistics.members);
 const getCrownRankings=crownRankings(storage,getPlayerStatistics.members,{battleLog:tag=>api('players/'+encodeURIComponent(tag)+'/battlelog',true)});
 const warBusy=new Set(),warPlacementCache=new Map(),warPlacementRequests=new Map();
 let attendanceBusy=false;
@@ -55,7 +57,7 @@ export const server=http.createServer(async(req,res)=>{
  const warStorage=clanStorage(storage,clanTag);
  const warHistory=()=>warStorage.read('history',[]),warRoster=()=>warStorage.read('members',null),warAbsences=()=>warStorage.read('absences',{});
  const warApi=path=>api('clans/%23'+clanTag+'/'+path,true);
- if(['/clan-ranglisten','/api/crown-rankings','/api/statistics-members','/api/statistics-player'].includes(requestUrl.pathname))req.url=requestUrl.pathname;
+ if(['/api/ranked-members','/clan-ranglisten','/api/crown-rankings','/api/statistics-members','/api/statistics-player'].includes(requestUrl.pathname))req.url=requestUrl.pathname;
  const tournamentPath=['/liga','/liga.html','/finals','/finals.html','/api/leagues','/api/finals'].includes(requestUrl.pathname);
  const selectedTournament=tournamentPath?(requestUrl.searchParams.get('tournament')||'current'):'current';
  if(tournamentPath){if(!/^(current|[a-f0-9-]{36})$/.test(selectedTournament))return send(400,{error:'Ungültige Turnierauswahl'});req.url=requestUrl.pathname;}
@@ -108,6 +110,7 @@ export const server=http.createServer(async(req,res)=>{
   const tag=requestUrl.searchParams.get('clan')||'22QJG0',player=requestUrl.searchParams.get('player');
   try{return send(200,req.url==='/api/statistics-members'?await getPlayerStatistics.members(tag):await getPlayerStatistics.player(tag,player));}catch(error){if(error.status)return send(error.status,{error:error.message});throw error;}
  }
+ if(req.method==='GET'&&req.url==='/api/ranked-members'){try{return send(200,await getRankedMembers(requestUrl.searchParams.get('clan')||'22QJG0'));}catch(error){if(error.status)return send(error.status,{error:error.message});throw error;}}
  if(req.method==='GET'&&req.url==='/api/crown-rankings'){try{return send(200,await getCrownRankings(requestUrl.searchParams.get('clan')||'22QJG0'));}catch(error){if(error.status)return send(error.status,{error:error.message});throw error;}}
  if(req.method==='GET'&&req.url==='/api/family-stats')return send(200,await getFamilyStats());
  if(req.method==='GET'&&req.url==='/api/public-clan'){
@@ -231,7 +234,7 @@ export const server=http.createServer(async(req,res)=>{
    return send(200,{imported:incoming.length,total:merged.size});
   }finally{warBusy.delete(clanTag);}
  }
- const files={'/clan-ranglisten':'clan-ranglisten.html','/clan-rankings-ui.mjs':'clan-rankings-ui.mjs','/current-race-ui.mjs':'current-race-ui.mjs','/spielerstatistiken':'spielerstatistiken.html','/spielerstatistiken.html':'spielerstatistiken.html','/player-stats-ui.mjs':'player-stats-ui.mjs','/tournament-config.mjs':'tournament-config.mjs','/finals-builder.mjs':'finals-builder.mjs','/turniere':'turniere.html','/turniere.html':'turniere.html','/tournaments-ui.mjs':'tournaments-ui.mjs','/tournament-context.mjs':'tournament-context.mjs','/menu-login.mjs':'menu-login.mjs','/navigation-update.css':'navigation-update.css','/content-ui.mjs':'content-ui.mjs','/content.css':'content.css','/membership.mjs':'membership.mjs','/news':'news.html','/news.html':'news.html','/clans':'clans.html','/clans.html':'clans.html','/clan':'clans.html','/clan.html':'clans.html','/galerie':'galerie.html','/galerie.html':'galerie.html','/admin-auth.mjs':'admin-auth.mjs','/':'home.html','/index.html':'home.html','/home.css':'home.css','/home.mjs':'home.mjs','/clan-portraits.png':'clan-portraits.png','/home-hero.png':'home-hero.png','/crest.svg':'crest.svg','/clankrieg':'index.html','/clankrieg/':'index.html','/site-auth.mjs':'site-auth.mjs','/site-auth.css':'site-auth.css','/liga':'liga.html','/finals':'finals.html','/finals.html':'finals.html','/finals.mjs':'finals.mjs','/liga.html':'liga.html','/liga.mjs':'liga.mjs','/liga.css':'liga.css','/league-core.mjs':'league-core.mjs','/finals-core.mjs':'finals-core.mjs','/app.mjs':'app.mjs','/core.mjs':'core.mjs','/membership.mjs':'membership.mjs','/export.mjs':'export.mjs','/responsive.mjs':'responsive.mjs','/style.css':'style.css'};
+ const files={'/ranked-members-ui.mjs':'ranked-members-ui.mjs','/clan-ranglisten':'clan-ranglisten.html','/clan-rankings-ui.mjs':'clan-rankings-ui.mjs','/current-race-ui.mjs':'current-race-ui.mjs','/spielerstatistiken':'spielerstatistiken.html','/spielerstatistiken.html':'spielerstatistiken.html','/player-stats-ui.mjs':'player-stats-ui.mjs','/tournament-config.mjs':'tournament-config.mjs','/finals-builder.mjs':'finals-builder.mjs','/turniere':'turniere.html','/turniere.html':'turniere.html','/tournaments-ui.mjs':'tournaments-ui.mjs','/tournament-context.mjs':'tournament-context.mjs','/menu-login.mjs':'menu-login.mjs','/navigation-update.css':'navigation-update.css','/content-ui.mjs':'content-ui.mjs','/content.css':'content.css','/membership.mjs':'membership.mjs','/news':'news.html','/news.html':'news.html','/clans':'clans.html','/clans.html':'clans.html','/clan':'clans.html','/clan.html':'clans.html','/galerie':'galerie.html','/galerie.html':'galerie.html','/admin-auth.mjs':'admin-auth.mjs','/':'home.html','/index.html':'home.html','/home.css':'home.css','/home.mjs':'home.mjs','/clan-portraits.png':'clan-portraits.png','/home-hero.png':'home-hero.png','/crest.svg':'crest.svg','/clankrieg':'index.html','/clankrieg/':'index.html','/site-auth.mjs':'site-auth.mjs','/site-auth.css':'site-auth.css','/liga':'liga.html','/finals':'finals.html','/finals.html':'finals.html','/finals.mjs':'finals.mjs','/liga.html':'liga.html','/liga.mjs':'liga.mjs','/liga.css':'liga.css','/league-core.mjs':'league-core.mjs','/finals-core.mjs':'finals-core.mjs','/app.mjs':'app.mjs','/core.mjs':'core.mjs','/membership.mjs':'membership.mjs','/export.mjs':'export.mjs','/responsive.mjs':'responsive.mjs','/style.css':'style.css'};
  if(req.method!=='GET'||!files[req.url])return send(404,{error:'Nicht gefunden'});
  res.writeHead(200,{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Type':req.url.endsWith('.png')?'image/png':req.url.endsWith('.svg')?'image/svg+xml':req.url.endsWith('.mjs')?'text/javascript':req.url.endsWith('.css')?'text/css':'text/html; charset=utf-8','Content-Security-Policy':"default-src 'self'; img-src 'self' blob: https://api-assets.clashroyale.com; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"});
  res.end(await readFile(new URL(files[req.url],root)));
