@@ -1,5 +1,5 @@
 import {familyTags} from './family-stats.mjs';
-const definitions=[{id:'global',name:'Ranked weltweit',location:'global'},{id:'germany',name:'Ranked Deutschland',location:57000094}];
+const definitions=[{id:'global',name:'Ranked Weltweit',location:'global'},{id:'germany',name:'Ranked Deutschland',location:57000094}];
 const fail=(status,message)=>Object.assign(Error(message),{status});
 export function rankedMembers(storage,api,members,{now=()=>Date.now()}={}){
  let pending,cached,attempted=-Infinity;
