@@ -18,7 +18,7 @@ async function load(){
  }catch(error){status.textContent=error.message;}
  finally{refresh.disabled=false;}
 }
-document.getElementById('crown-clan').textContent=names[tag]??'Unbekannter Clan';
-document.title=(names[tag]??'Clan')+' · Kronenturnier-Ranglisten';
+document.getElementById('crown-clan').textContent='Spielerdaten · '+(names[tag]??'Unbekannter Clan');
+document.title=(names[tag]??'Clan')+' · Spielerdaten';
 refresh.addEventListener('click',load);
 if(names[tag])load();else{status.textContent='Ungültige Clanauswahl.';refresh.disabled=true;}
